@@ -31,7 +31,7 @@ def test_index_renders_html():
     assert "Lukav" in resp.text
 
 
-def test_tool_registry_empty_at_phase_0():
+def test_tool_registry_is_built():
     from lukav.tools._all import build_full_registry
     registry = build_full_registry()
-    assert registry.names() == []
+    assert len(registry.names()) > 0

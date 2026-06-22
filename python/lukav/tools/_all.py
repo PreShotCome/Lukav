@@ -9,11 +9,13 @@ from .base import ToolRegistry
 
 def build_full_registry() -> ToolRegistry:
     registry = ToolRegistry()
-    # Phase 1+: lazy-imported tool modules, each with a `register(registry)`.
-    # for _, module in _import_modules():
-    #     module.register(registry)
+    for _, module in _import_modules():
+        module.register(registry)
     return registry
 
 
 def _import_modules():
-    return []
+    from . import plaid_tools
+    return [
+        ("plaid", plaid_tools),
+    ]

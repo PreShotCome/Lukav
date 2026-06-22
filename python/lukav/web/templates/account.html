@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <div>
+    <strong>{{ account.name }}</strong>
+    <span class="muted">•{{ account.mask or '?' }} · {{ account.subtype or 'credit card' }}</span>
+  </div>
+  <p class="muted">
+    Balance ${{ "%.2f" % (account.current_balance or 0) }}
+    of ${{ "%.2f" % (account.credit_limit or 0) }} limit
+  </p>
+  {% if liability %}
+  <p class="muted">
+    Statement balance ${{ "%.2f" % (liability.last_statement_balance or 0) }}
+    · Min payment ${{ "%.2f" % (liability.minimum_payment_amount or 0) }}
+    · Due {{ liability.next_payment_due_date or '?' }}
+  </p>
+  <p class="muted">
+    {% for apr in liability.aprs %}
+      {{ apr.apr_type }}: <span class="accent">{{ "%.2f%%" % apr.apr_percentage }}</span>
+      (balance ${{ "%.2f" % (apr.balance_subject_to_apr or 0) }},
+       interest ${{ "%.2f" % (apr.interest_charge_amount or 0) }})
+      {% if not loop.last %} · {% endif %}
+    {% endfor %}
+  </p>
+  {% endif %}
+  <p>
+    <form method="post" action="/sync/{{ account.item_id }}" style="display:inline">
+      <button type="submit">Resync</button>
+    </form>
+    {# Phase 2 surfaces the Scan button here #}
+  </p>
+</div>
+
+<div class="card">
+  <strong>Recent transactions</strong>
+  {% if not transactions %}
+  <p class="muted">No transactions yet — run a sync.</p>
+  {% else %}
+  <table style="width:100%;border-collapse:collapse">
+    <thead>
+      <tr class="muted">
+        <th align="left">Date</th>
+        <th align="left">Merchant</th>
+        <th align="right">Amount</th>
+        <th align="left">Category</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in transactions %}
+      <tr>
+        <td>{{ t.posted_date }}</td>
+        <td>{{ t.merchant_name or t.name }}</td>
+        <td align="right">${{ "%.2f" % t.amount }}</td>
+        <td class="muted">{{ t.category or '' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endblock %}

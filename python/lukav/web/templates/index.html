@@ -1,15 +1,55 @@
 {% extends "base.html" %}
 {% block content %}
+{% if not cards %}
 <div class="card">
   <p class="ok">Lukav is running.</p>
-  <p class="muted">
-    No accounts linked yet. Phase 1 will surface a
-    <code>Link a card</code> button here once Plaid is wired up.
+  <p class="muted">No cards linked yet.</p>
+  <p><a class="accent" href="/link">Link a credit card &rarr;</a></p>
+  <p class="muted">Plaid environment: <code>{{ plaid_env }}</code>
+  {% if not have_creds %}<span class="bad">(no credentials configured)</span>{% endif %}
   </p>
 </div>
+{% else %}
+<div class="card">
+  <strong>Linked cards</strong>
+  <span class="muted">— <a class="accent" href="/link">link another</a> ·
+    <form method="post" action="/sync" style="display:inline">
+      <button type="submit">Sync all</button>
+    </form>
+  </span>
+</div>
+{% for c in cards %}
+<div class="card">
+  <div>
+    <strong><a class="accent" href="/account/{{ c.account.account_id }}">
+      {{ c.account.name }}
+    </a></strong>
+    <span class="muted">•{{ c.account.mask or '?' }} · {{ c.account.subtype or 'credit card' }}</span>
+  </div>
+  <p class="muted">
+    Balance ${{ "%.2f" % (c.account.current_balance or 0) }}
+    of ${{ "%.2f" % (c.account.credit_limit or 0) }} limit
+  </p>
+  {% if c.liability %}
+  <p class="muted">
+    Statement balance ${{ "%.2f" % (c.liability.last_statement_balance or 0) }}
+    · Min payment ${{ "%.2f" % (c.liability.minimum_payment_amount or 0) }}
+    · Due {{ c.liability.next_payment_due_date or '?' }}
+  </p>
+  <p class="muted">
+    {% for apr in c.liability.aprs %}
+      {{ apr.apr_type }}: <span class="accent">{{ "%.2f%%" % apr.apr_percentage }}</span>
+      {% if not loop.last %} · {% endif %}
+    {% endfor %}
+  </p>
+  {% endif %}
+</div>
+{% endfor %}
+{% endif %}
 <div class="card">
   <p class="muted">
-    Health check: <a class="accent" href="/healthz">/healthz</a>
+    Health check: <a class="accent" href="/healthz">/healthz</a> ·
+    Plaid env: <code>{{ plaid_env }}</code>
   </p>
 </div>
 {% endblock %}

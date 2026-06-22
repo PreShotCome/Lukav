@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <p class="bad">Plaid credentials are not configured.</p>
+  <p class="muted">
+    Set the following before linking a card (env vars or
+    <code>keyring set lukav PLAID_CLIENT_ID</code> / <code>… PLAID_SECRET</code>):
+  </p>
+  <ul class="muted">
+    <li><code>PLAID_CLIENT_ID</code></li>
+    <li><code>PLAID_SECRET</code></li>
+    <li><code>PLAID_ENV</code> (sandbox / development / production, default <code>sandbox</code>)</li>
+  </ul>
+  <p class="muted">Current PLAID_ENV: <code>{{ plaid_env }}</code></p>
+  <p><a class="accent" href="/">&larr; Back to dashboard</a></p>
+</div>
+{% endblock %}
