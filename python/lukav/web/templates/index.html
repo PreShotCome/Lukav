@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <p class="ok">Lukav is running.</p>
+  <p class="muted">
+    No accounts linked yet. Phase 1 will surface a
+    <code>Link a card</code> button here once Plaid is wired up.
+  </p>
+</div>
+<div class="card">
+  <p class="muted">
+    Health check: <a class="accent" href="/healthz">/healthz</a>
+  </p>
+</div>
+{% endblock %}

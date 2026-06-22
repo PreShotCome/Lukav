@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{ title or "Lukav" }}</title>
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --surface: #161a22;
+      --card: #1d222d;
+      --text: #e6e8ec;
+      --muted: #8b93a7;
+      --accent: #d4a657;
+      --red: #e06868;
+      --green: #6cd49a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 2rem;
+      font-family: -apple-system, system-ui, sans-serif;
+      background: var(--bg); color: var(--text);
+    }
+    main { max-width: 960px; margin: 0 auto; }
+    header { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 2rem; }
+    h1 { margin: 0; font-size: 1.6rem; }
+    h1 a { color: var(--accent); text-decoration: none; }
+    .muted { color: var(--muted); font-size: 0.9rem; }
+    .card {
+      background: var(--card); padding: 1.25rem 1.5rem;
+      border-radius: 8px; margin: 1rem 0;
+    }
+    code { background: var(--surface); padding: 0.1rem 0.35rem; border-radius: 4px; }
+    .ok { color: var(--green); }
+    .bad { color: var(--red); }
+    .accent { color: var(--accent); }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1><a href="/">Lukav</a></h1>
+    <span class="muted">credit-card debt auditor</span>
+  </header>
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>
