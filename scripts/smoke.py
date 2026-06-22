@@ -125,6 +125,46 @@ def main() -> int:
     )
     assert resp.status_code == 303
 
+    # 8. Phase 5: ingest a pasted letter into a new collection. Fake the
+    # LLM so smoke runs offline.
+    from lukav.tests.test_ingest import FakeLLM, SAMPLE_LETTER_TEXT
+    fake = FakeLLM({
+        "collector_name": "Portfolio Recovery Associates",
+        "collector_address": "120 Corporate Blvd, Norfolk, VA",
+        "original_creditor": "Chase",
+        "alleged_amount": 555.55,
+        "letter_date": "2024-10-14",
+        "summary": "Threatened suit on aged debt",
+        "threat_of_suit": True,
+        "time_bar_disclosure": True,
+        "deadline_mentioned": "30 days",
+    })
+    import lukav.ingest as _ingest
+    _ingest.build_default_client = lambda *a, **kw: fake  # type: ignore[assignment]
+
+    resp = client.post("/ingest", data={
+        "pasted_text": SAMPLE_LETTER_TEXT,
+        "collection_id": "",
+        "state": "TX",
+    })
+    assert resp.status_code == 200
+    assert "Portfolio Recovery Associates" in resp.text
+
+    resp = client.post("/ingest/save", data={
+        "action": "new",
+        "collection_id": "",
+        "state": "TX",
+        "collector_name": "Portfolio Recovery Associates",
+        "collector_address": "120 Corporate Blvd, Norfolk, VA",
+        "original_creditor": "Chase",
+        "alleged_amount": "555.55",
+        "letter_date": "2024-10-14",
+        "summary": "Threatened suit on aged debt",
+        "threat_of_suit": "1",
+        "time_bar_disclosure": "1",
+    }, follow_redirects=False)
+    assert resp.status_code == 303
+
     print("smoke OK")
     return 0
 

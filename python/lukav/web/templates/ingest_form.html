@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <strong>Ingest a collection letter</strong>
+  <p class="muted">
+    Upload a PDF or image, or paste the letter text below. Lukav will
+    extract the collector, original creditor, alleged amount, date,
+    and any threats — then either create a new collection from it or
+    attach it as a "letter" communication to an existing one.
+  </p>
+  <p class="muted">
+    Image ingest needs <code>tesseract</code> installed
+    (<code>pip install lukav[ocr]</code> + the system binary). PDFs
+    work out of the box. If extraction fails, paste the text manually.
+  </p>
+</div>
+
+<div class="card">
+  <form method="post" action="/ingest" enctype="multipart/form-data">
+    <p><label>Upload PDF or image
+      <input type="file" name="file" accept=".pdf,.png,.jpg,.jpeg,.bmp,.tiff,.webp">
+    </label></p>
+    <p class="muted">— or paste —</p>
+    <p><label>Paste letter text<br>
+      <textarea name="pasted_text" rows="10" cols="70"
+                placeholder="Paste here and submit"></textarea></label></p>
+    <hr style="border-color:var(--surface)">
+    <p><label>Attach to existing collection (optional)
+      <select name="collection_id">
+        <option value="">— create a new collection —</option>
+        {% for c in collections %}
+        <option value="{{ c.collection_id }}">{{ c.collector_name }} (${{ "%.2f" % c.alleged_amount }})</option>
+        {% endfor %}
+      </select></label></p>
+    <p><label>Your state (used if creating new)
+      <input name="state" maxlength="2"></label></p>
+    <p><button type="submit">Extract</button>
+       <a class="accent" href="/collections">cancel</a></p>
+  </form>
+</div>
+{% endblock %}

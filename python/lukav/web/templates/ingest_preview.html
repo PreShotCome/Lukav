@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <strong>Extraction preview</strong>
+  <p class="muted">
+    Source: <code>{{ result.source }}</code> ·
+    LLM backend: <code>{{ result.backend }}</code>
+    {% if result.backend == "none" %}
+    <span class="bad">(no LLM available — fill the fields yourself from the raw text below)</span>
+    {% endif %}
+  </p>
+  <p class="muted">Review and edit before saving.</p>
+</div>
+
+<form method="post" action="/ingest/save">
+<input type="hidden" name="collection_id" value="{{ collection_id }}">
+<input type="hidden" name="state" value="{{ state }}">
+
+<div class="card">
+  <p><label>Collector name<br>
+    <input name="collector_name" size="50" value="{{ result.collector_name }}"></label></p>
+  <p><label>Collector address<br>
+    <textarea name="collector_address" rows="3" cols="50">{{ result.collector_address }}</textarea></label></p>
+  <p><label>Original creditor<br>
+    <input name="original_creditor" size="50" value="{{ result.original_creditor }}"></label></p>
+  <p><label>Alleged amount $
+    <input name="alleged_amount" type="number" step="0.01" min="0" value="{{ result.alleged_amount }}"></label></p>
+  <p><label>Letter date (YYYY-MM-DD)
+    <input name="letter_date" value="{{ result.letter_date or '' }}"></label></p>
+  <p><label>Summary<br>
+    <textarea name="summary" rows="3" cols="60">{{ result.summary }}</textarea></label></p>
+  <p>
+    <label><input type="checkbox" name="threat_of_suit" value="1"
+                  {% if result.threat_of_suit %}checked{% endif %}> threatened suit</label>
+    <label><input type="checkbox" name="time_bar_disclosure" value="1"
+                  {% if result.time_bar_disclosure %}checked{% endif %}> CFPB time-bar disclosure present</label>
+  </p>
+  {% if result.deadline_mentioned %}
+  <p class="muted">LLM noted deadline language: <code>{{ result.deadline_mentioned }}</code></p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <p>
+    {% if collection_id %}
+    <button type="submit" name="action" value="attach">Attach to selected collection</button>
+    {% else %}
+    <button type="submit" name="action" value="new">Create new collection from this</button>
+    {% endif %}
+    <a class="accent" href="/ingest">start over</a>
+  </p>
+</div>
+
+{% if raw_text %}
+<div class="card">
+  <strong>Raw extracted text</strong>
+  <pre style="white-space:pre-wrap; background:var(--surface); padding:1rem; border-radius:6px; max-height:300px; overflow:auto">{{ raw_text }}</pre>
+</div>
+{% endif %}
+
+{% if result.notes and result.backend in ("none", "error") %}
+<div class="card">
+  <strong>Notes</strong>
+  <pre style="white-space:pre-wrap">{{ result.notes }}</pre>
+</div>
+{% endif %}
+</form>
+{% endblock %}
