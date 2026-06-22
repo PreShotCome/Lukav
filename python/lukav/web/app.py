@@ -36,6 +36,12 @@ from lukav.ingest import (
     ExtractedLetter, ingest, ingest_text, to_collection_payload,
     to_communication_payload,
 )
+from lukav.ingest_credit_report import (
+    CreditReportExtraction, ingest_credit_report,
+    to_collection_payload as tradeline_to_payload,
+)
+from lukav.cfpb_lookup import lookup as cfpb_lookup
+from lukav.legal import debt_buyers
 from lukav.plaid_client import PlaidClient, PlaidLike, default_window
 from lukav.models.debt_models import Item
 from lukav.storage import db
@@ -364,6 +370,7 @@ def create_app(plaid: Optional[PlaidLike] = None) -> FastAPI:
                 "letters": list_collection_letters(coll_id),
                 "rule_to_template": COLLECTION_RULE_TO_TEMPLATE,
                 "pickable_templates": PICKABLE_TEMPLATES,
+                "buyer": debt_buyers.match(coll.collector_name or ""),
             },
         )
 
@@ -589,6 +596,82 @@ def create_app(plaid: Optional[PlaidLike] = None) -> FastAPI:
                                     status_code=303)
 
         raise HTTPException(status_code=400, detail=f"unknown action {action!r}")
+
+    # ---- Phase 8: credit-report bulk ingest --------------------------
+
+    @app.get("/credit-report", response_class=HTMLResponse)
+    def credit_report_form(request: Request):
+        return templates.TemplateResponse(
+            request, "credit_report_form.html",
+            {"title": "Credit report ingest"},
+        )
+
+    @app.post("/credit-report", response_class=HTMLResponse)
+    async def credit_report_extract(request: Request,
+                                    state: str = Form(""),
+                                    file: Optional[UploadFile] = File(None)):
+        if file is None or not file.filename:
+            raise HTTPException(status_code=400, detail="upload a PDF")
+        data = await file.read()
+        result: CreditReportExtraction = ingest_credit_report(data, file.filename)
+        return templates.TemplateResponse(
+            request, "credit_report_preview.html",
+            {
+                "title": "Credit report preview",
+                "result": result,
+                "state": state.strip().upper(),
+            },
+        )
+
+    @app.post("/credit-report/save", response_class=RedirectResponse)
+    async def credit_report_save(request: Request):
+        form = await request.form()
+        state = (form.get("state") or "").strip().upper()
+        rows = int(form.get("row_count") or 0)
+        created: list[str] = []
+        for i in range(rows):
+            if not form.get(f"keep_{i}"):
+                continue
+            from lukav.ingest_credit_report import Tradeline
+            t = Tradeline(
+                collector_name=(form.get(f"collector_name_{i}") or "").strip(),
+                original_creditor=(form.get(f"original_creditor_{i}") or "").strip(),
+                alleged_amount=float(form.get(f"alleged_amount_{i}") or 0),
+                account_mask=(form.get(f"account_mask_{i}") or "").strip() or None,
+                date_of_first_delinquency=(
+                    (form.get(f"date_of_first_delinquency_{i}") or "").strip()
+                    or None
+                ),
+                last_activity_date=(
+                    (form.get(f"last_activity_date_{i}") or "").strip()
+                    or None
+                ),
+                status=(form.get(f"status_{i}") or "in_collection").strip(),
+                bureau=(form.get(f"bureau_{i}") or "").strip(),
+                notes=(form.get(f"notes_{i}") or "").strip(),
+            )
+            coll_id = add_collection(tradeline_to_payload(t, fallback_state=state))
+            created.append(coll_id)
+        # If only one created, jump straight to it; else list view.
+        if len(created) == 1:
+            return RedirectResponse(url=f"/collections/{created[0]}",
+                                    status_code=303)
+        return RedirectResponse(url="/collections", status_code=303)
+
+    @app.get("/collections/{coll_id}/cfpb", response_class=HTMLResponse)
+    def collections_cfpb(coll_id: str, request: Request):
+        coll = get_collection(coll_id)
+        if not coll:
+            raise HTTPException(status_code=404, detail="collection not found")
+        result = cfpb_lookup(coll.collector_name)
+        return templates.TemplateResponse(
+            request, "cfpb_lookup.html",
+            {
+                "title": f"CFPB complaints — {coll.collector_name}",
+                "collection": coll,
+                "result": result,
+            },
+        )
 
     return app
 

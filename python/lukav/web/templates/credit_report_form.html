@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <strong>Credit-report ingest</strong>
+  <p class="muted">
+    Upload one of your 3-bureau reports (PDF) from
+    <code>annualcreditreport.com</code>. Lukav pulls every negative
+    tradeline — collections, charge-offs, sold debts — and lets you
+    create a collection account for each in one shot.
+  </p>
+  <p class="muted">
+    You're encouraged to upload all three bureaus separately
+    (Equifax, Experian, TransUnion) — duplicates across bureaus are
+    useful: each tradeline can be disputed at every bureau it appears.
+  </p>
+</div>
+
+<div class="card">
+  <form method="post" action="/credit-report" enctype="multipart/form-data">
+    <p><label>Credit-report PDF
+      <input type="file" name="file" accept=".pdf" required></label></p>
+    <p><label>Your state (used for SOL checks)
+      <input name="state" maxlength="2"></label></p>
+    <p><button type="submit">Extract tradelines</button>
+       <a class="accent" href="/collections">cancel</a></p>
+  </form>
+</div>
+{% endblock %}

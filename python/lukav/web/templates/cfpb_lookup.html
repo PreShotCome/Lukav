@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <strong>CFPB complaints — {{ collection.collector_name }}</strong>
+  <p class="muted">
+    Public CFPB consumer-complaint database, debt-collection product.
+    {% if result.error %}<span class="bad">— {{ result.error }}</span>{% endif %}
+  </p>
+  <p><a class="accent" href="/collections/{{ collection.collection_id }}">&larr; back to collection</a></p>
+</div>
+
+<div class="card">
+  <strong>Total hits:</strong> {{ result.total_hits }}
+</div>
+
+{% if result.top_issues %}
+<div class="card">
+  <strong>Top reported issues</strong>
+  <ul>
+  {% for issue, count in result.top_issues %}
+    <li>{{ issue }} <span class="muted">({{ count }})</span></li>
+  {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{% for hit in result.recent %}
+<div class="card">
+  <p>
+    <strong>{{ hit.issue }}</strong>
+    {% if hit.sub_issue %}<span class="muted">— {{ hit.sub_issue }}</span>{% endif %}
+    <span class="muted">{{ hit.state }} · {{ hit.date_received }}</span>
+  </p>
+  {% if hit.narrative %}
+  <p class="muted">{{ hit.narrative }}{% if hit.narrative|length >= 600 %}…{% endif %}</p>
+  {% endif %}
+</div>
+{% endfor %}
+{% endblock %}
