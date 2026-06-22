@@ -6,13 +6,29 @@
     Backend: <code>{{ result.backend }}</code>
     {% if result.error %}<span class="bad">— {{ result.error }}</span>{% endif %}
   </p>
+  {% if result.backend == "OllamaClient" %}
+  <p class="bad">
+    Warning: Ollama (a local model) was used, not Claude. On most local
+    models the extraction will be unreliable — fields are often
+    hallucinated, especially amounts and dates. Set
+    <code>LUKAV_LLM_BACKEND=claude</code> and re-run, or check
+    <code>python -m lukav --check-llm</code>.
+  </p>
+  {% elif result.backend in ("none", "error") %}
+  <p class="bad">
+    The LLM did not run. Without it, this page only shows the raw text
+    below and you'll need to add tradelines by hand via
+    <a class="accent" href="/collections/new">/collections/new</a>.
+    Diagnose with <code>python -m lukav --check-llm</code>.
+  </p>
+  {% endif %}
   {% if not result.tradelines %}
-  <p class="muted">No negative tradelines extracted.
-    {% if result.backend == "none" %}Set up Claude (see settings) and retry.{% endif %}
-    Or use <a class="accent" href="/collections/new">/collections/new</a> to add one by hand.</p>
+  <p class="muted">No negative tradelines extracted.</p>
   {% else %}
   <p class="muted">
     Untick any row you don't want imported. Edit fields inline before saving.
+    Always cross-check against the raw text at the bottom — LLMs sometimes
+    invent plausible-looking values.
   </p>
   {% endif %}
 </div>

@@ -7,6 +7,8 @@
     LLM backend: <code>{{ result.backend }}</code>
     {% if result.backend == "none" %}
     <span class="bad">(no LLM available — fill the fields yourself from the raw text below)</span>
+    {% elif result.backend == "OllamaClient" %}
+    <span class="bad">(Ollama / local model — extraction may be unreliable; set LUKAV_LLM_BACKEND=claude for better accuracy)</span>
     {% endif %}
   </p>
   <p class="muted">Review and edit before saving.</p>
