@@ -19,8 +19,23 @@
       <button type="submit">Run scan</button>
     </form>
     · <a class="accent" href="/ingest">↑ Ingest a letter</a>
+    · <a class="accent" href="/collections/{{ collection.collection_id }}/cfpb">CFPB complaints</a>
   </p>
 </div>
+
+{% if buyer %}
+<div class="card">
+  <strong class="accent">Debt buyer detected: {{ buyer.name }}</strong>
+  {% if buyer.parent %}<span class="muted">(parent: {{ buyer.parent }})</span>{% endif %}
+  <p class="muted">{{ buyer.note }}</p>
+  <p class="muted">
+    Next move: demand chain-of-title proof under §1692g — the bill of
+    sale plus account-level documentation tying the original creditor
+    to this buyer. Generate a
+    <a class="accent" href="/collections/{{ collection.collection_id }}/letter/collection_validation.j2">validation letter</a>.
+  </p>
+</div>
+{% endif %}
 
 <div class="card">
   <strong>Pickable letter templates</strong>

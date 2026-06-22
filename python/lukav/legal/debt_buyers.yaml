@@ -1,0 +1,75 @@
+# Known debt buyers and large junk-debt collectors. When a CollectionAccount's
+# collector_name matches one of these (case-insensitive substring), Lukav
+# surfaces a "debt buyer" badge on the detail page and suggests demanding
+# chain-of-title proof under §1692g.
+#
+# Source: CFPB Consumer Reporting Markets reports + public 10-Ks of the
+# major debt buyers + plaintiffs' bar lists.
+
+buyers:
+  - name: Midland Credit Management
+    aliases: [Midland Funding, Midland Credit, MCM, Encore Capital]
+    parent: Encore Capital Group
+    note: >-
+      Encore-owned. One of the two largest debt buyers in the US. CFPB
+      consent order history (CFPB v. Encore, 2015 and 2020) — review
+      conduct against those orders. Demand chain of title back to the
+      original creditor.
+
+  - name: Portfolio Recovery Associates
+    aliases: [PRA Group, Portfolio Recovery]
+    parent: PRA Group
+    note: >-
+      Other top-two US debt buyer. Same CFPB consent-order posture as
+      Encore (CFPB v. PRA, 2015 and 2023). Often missing original
+      account-level documentation.
+
+  - name: LVNV Funding
+    aliases: [Resurgent Capital, Sherman Financial, Sherman Originator]
+    parent: Sherman Financial Group
+    note: >-
+      Sherman / Resurgent network. LVNV is the named holder on most
+      tradelines but the servicer is Resurgent. State licensing
+      challenges have been successful (e.g., Maryland, Massachusetts).
+
+  - name: Cavalry Portfolio Services
+    aliases: [Cavalry SPV I, Cavalry SPV II, Cavalry Investments]
+    parent: Cavalry Investments
+    note: >-
+      Cavalry SPV vehicles. Frequent target of FDCPA suits; sometimes
+      sues on out-of-statute debts. Demand DOFD + chain-of-title.
+
+  - name: Jefferson Capital Systems
+    aliases: [Jefferson Capital]
+    parent: Jefferson Capital
+    note: Significant debt buyer. Same chain-of-title posture.
+
+  - name: Unifin
+    aliases: [Unifin Inc]
+    parent: ""
+    note: Third-party collector working on behalf of original creditors and buyers.
+
+  - name: Convergent Outsourcing
+    aliases: [Convergent]
+    parent: ""
+    note: Large third-party collector. Phone-heavy collector; review Reg F 7-in-7.
+
+  - name: Enhanced Recovery Company
+    aliases: [ERC, Enhanced Recovery Corporation]
+    parent: ""
+    note: Phone-heavy collector. Frequent Reg F and §1692d cases.
+
+  - name: National Credit Adjusters
+    aliases: [NCA]
+    parent: ""
+    note: Mid-tier debt buyer. Often weak documentation.
+
+  - name: I.C. System
+    aliases: [IC System, ICS]
+    parent: ""
+    note: Third-party collector.
+
+  - name: TrueAccord
+    aliases: [True Accord]
+    parent: ""
+    note: Email/SMS-first collector — verify Reg F E.10 email/text rules.
