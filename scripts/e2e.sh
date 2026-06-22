@@ -25,6 +25,9 @@ python -m pytest
 echo "==> smoke construct"
 python -m lukav --check
 
+echo "==> end-to-end smoke (Plaid+scan+letter)"
+LUKAV_DB="$(mktemp -d)/smoke.db" python scripts/smoke.py
+
 echo "==> booting server on ${PORT}"
 LOG="$(mktemp)"
 python -m lukav --no-open --host 127.0.0.1 --port "${PORT}" >"${LOG}" 2>&1 &

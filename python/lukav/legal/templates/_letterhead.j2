@@ -1,0 +1,12 @@
+{{ profile.name }}
+{{ profile.address_line1 }}
+{% if profile.address_line2 %}{{ profile.address_line2 }}
+{% endif %}{{ profile.city }}, {{ profile.state }} {{ profile.zip }}
+
+{{ today }}
+
+{% if recipient %}{{ recipient.name }}
+{{ recipient.address_line1 }}
+{% if recipient.address_line2 %}{{ recipient.address_line2 }}
+{% endif %}{{ recipient.city }}, {{ recipient.state }} {{ recipient.zip }}
+{% endif %}

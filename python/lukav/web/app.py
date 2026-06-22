@@ -17,12 +17,18 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from lukav.audit_engine import (
-    init_findings, list_findings, load_context, save_context, scan_account,
+    get_finding, init_findings, list_findings, load_context, save_context,
+    scan_account,
+)
+from lukav.dispute_engine import (
+    get_letter, get_profile, init_letters, list_letters, render_letter,
+    save_letter, save_profile, template_for,
 )
 from lukav.plaid_client import PlaidClient, PlaidLike, default_window
 from lukav.models.debt_models import Item
 from lukav.storage import db
 from lukav.storage.secrets import have_plaid_creds, plaid_env
+from lukav.tools.legal_research import analyze_finding
 
 _HERE = Path(__file__).resolve().parent
 TEMPLATE_DIR = _HERE / "templates"
@@ -39,6 +45,7 @@ def create_app(plaid: Optional[PlaidLike] = None) -> FastAPI:
 
     db.init_db()
     init_findings()
+    init_letters()
     plaid_client: PlaidLike = plaid or PlaidClient()
 
     # ---- core ---------------------------------------------------------
@@ -188,6 +195,103 @@ def create_app(plaid: Optional[PlaidLike] = None) -> FastAPI:
         }
         save_context(account_id, payload)
         return RedirectResponse(url=f"/scan/{account_id}", status_code=303)
+
+    # ---- profile (recipient info on dispute letters) ----------------
+
+    @app.get("/settings", response_class=HTMLResponse)
+    def settings_page(request: Request):
+        return templates.TemplateResponse(
+            request, "settings.html",
+            {"title": "Settings", "profile": get_profile()},
+        )
+
+    @app.post("/settings", response_class=RedirectResponse)
+    def settings_save(
+        name: str = Form(""),
+        address_line1: str = Form(""),
+        address_line2: str = Form(""),
+        city: str = Form(""),
+        state: str = Form(""),
+        zip: str = Form(""),
+    ):
+        save_profile({
+            "name": name.strip(),
+            "address_line1": address_line1.strip(),
+            "address_line2": address_line2.strip(),
+            "city": city.strip(),
+            "state": state.strip().upper(),
+            "zip": zip.strip(),
+        })
+        return RedirectResponse(url="/settings", status_code=303)
+
+    # ---- letters ----------------------------------------------------
+
+    @app.get("/letter/{finding_id}", response_class=HTMLResponse)
+    def letter_preview(finding_id: str, request: Request):
+        finding = get_finding(finding_id)
+        if not finding:
+            raise HTTPException(status_code=404, detail="finding not found")
+        template_name = template_for(finding)
+        if not template_name:
+            raise HTTPException(
+                status_code=400,
+                detail=f"no dispute template wired for rule {finding.rule_id}",
+            )
+        body = render_letter(finding_id)
+        profile_complete = bool(get_profile().get("name"))
+        review = analyze_finding(finding_id) if profile_complete else None
+        return templates.TemplateResponse(
+            request, "letter.html",
+            {
+                "title": f"Letter — {finding.title}",
+                "finding": finding,
+                "template_name": template_name,
+                "body": body,
+                "profile_complete": profile_complete,
+                "review": review,
+            },
+        )
+
+    @app.post("/letter/{finding_id}/save", response_class=RedirectResponse)
+    def letter_save(finding_id: str):
+        finding = get_finding(finding_id)
+        if not finding:
+            raise HTTPException(status_code=404, detail="finding not found")
+        body = render_letter(finding_id)
+        if body is None:
+            raise HTTPException(status_code=400, detail="cannot render letter")
+        template_name = template_for(finding)
+        letter_id = save_letter(finding_id, body, template_name or "")
+        return RedirectResponse(url=f"/letters/{letter_id}", status_code=303)
+
+    @app.get("/letter/{finding_id}/text")
+    def letter_text(finding_id: str):
+        body = render_letter(finding_id)
+        if body is None:
+            raise HTTPException(status_code=404, detail="finding not found")
+        from fastapi.responses import PlainTextResponse
+        return PlainTextResponse(
+            body, headers={
+                "Content-Disposition": f'attachment; filename="lukav-letter-{finding_id}.txt"',
+            },
+        )
+
+    @app.get("/letters", response_class=HTMLResponse)
+    def letters_index(request: Request):
+        return templates.TemplateResponse(
+            request, "letters.html",
+            {"title": "Letters", "letters": list_letters()},
+        )
+
+    @app.get("/letters/{letter_id}", response_class=HTMLResponse)
+    def letter_view(letter_id: str, request: Request):
+        letter = get_letter(letter_id)
+        if not letter:
+            raise HTTPException(status_code=404, detail="letter not found")
+        return templates.TemplateResponse(
+            request, "letter_saved.html",
+            {"title": "Saved letter", "letter": letter},
+        )
 
     return app
 

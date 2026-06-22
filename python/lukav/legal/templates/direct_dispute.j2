@@ -1,0 +1,28 @@
+{% include "_letterhead.j2" %}
+
+Re: Direct dispute under 15 U.S.C. §1681s-2(a)(8)
+Account: {{ account.name }} ending {{ account.mask or '****' }}
+
+To whom it may concern,
+
+I am the consumer associated with the above-referenced account. The
+information you are furnishing about this account to one or more
+consumer reporting agencies is inaccurate. Pursuant to 15 U.S.C.
+§1681s-2(a)(8) and 12 CFR Part 1022 Subpart E, I am directly
+disputing the following with you, the furnisher:
+
+{{ finding.evidence.get('basis') or finding.description }}
+
+Specific basis for the dispute:
+  - The auditor's machine check observed: {{ finding.title }}.
+  - Citation supporting the standard at issue: {{ finding.citation }}.
+
+Please conduct a reasonable investigation within the statutory window
+and either correct the inaccuracy with each consumer reporting agency
+to which you reported, or notify me in writing of your determination
+and the basis for it.
+
+Sincerely,
+
+
+{{ profile.name }}

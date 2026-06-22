@@ -1,0 +1,30 @@
+{% include "_letterhead.j2" %}
+
+Re: Dispute of inaccurate information under 15 U.S.C. §1681i
+Account: {{ account.name }} ending {{ account.mask or '****' }}
+
+To the Dispute Resolution Department:
+
+I am writing to dispute information appearing on my consumer file
+relating to the above-referenced account. Pursuant to the Fair Credit
+Reporting Act, 15 U.S.C. §1681i, I am requesting a reinvestigation
+and correction of the following inaccuracy:
+
+{{ finding.evidence.get('basis') or finding.description }}
+
+Please conduct the reinvestigation within the 30-day window required
+by §1681i(a)(1), notify each furnisher of the dispute under
+§1681i(a)(2), and forward to me a written notice of the results under
+§1681i(a)(6).
+
+If the disputed item is verified by a furnisher, please send me a
+description of the procedure used to determine the accuracy and
+completeness of the information, including the business name, address,
+and (if reasonably available) the telephone number of any furnisher
+contacted in connection with the reinvestigation, as required by
+§1681i(a)(7).
+
+Sincerely,
+
+
+{{ profile.name }}

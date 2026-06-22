@@ -1,0 +1,30 @@
+{% include "_letterhead.j2" %}
+
+Re: Billing-error notice under 15 U.S.C. §1666 (Fair Credit Billing Act)
+Account: {{ account.name }} ending {{ account.mask or '****' }}
+
+To the Billing Inquiries Department:
+
+This letter is a written billing-error notice under 15 U.S.C. §1666
+and 12 CFR §1026.13. I dispute the following item appearing on a
+recent statement of the above account:
+
+{{ finding.description }}
+
+Citation supporting the standard at issue: {{ finding.citation }}.
+
+{% if finding.evidence %}Evidence the auditor recorded:
+{% for k, v in finding.evidence.items() %}  - {{ k }}: {{ v }}
+{% endfor %}{% endif %}
+
+Please acknowledge receipt of this notice in writing within 30 days
+and complete your investigation within two complete billing cycles
+(and in no event later than 90 days) of receipt, as §1666 requires.
+While the investigation is pending, you may not (a) attempt to collect
+the disputed amount, (b) treat the amount as past due, or (c) report
+the amount as delinquent to any consumer reporting agency.
+
+Sincerely,
+
+
+{{ profile.name }}

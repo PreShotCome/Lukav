@@ -1,0 +1,28 @@
+{% include "_letterhead.j2" %}
+
+Re: Request for validation of debt
+Account: {{ account.name }} ending {{ account.mask or '****' }}
+{% if finding.evidence.get('collection_letter_date') %}Collection notice received: {{ finding.evidence['collection_letter_date'] }}
+{% endif %}
+
+To whom it may concern,
+
+This is a written request, made pursuant to 15 U.S.C. §1692g(b), for
+validation of the debt referenced above. Within 30 days of your first
+written communication to me regarding this debt, you must:
+
+  1. Provide verification of the debt, including the original creditor,
+     the amount alleged, and an itemized statement;
+  2. Cease all collection activity until validation is provided.
+
+Until you have satisfied these obligations I do not waive any right
+under the Fair Debt Collection Practices Act or the Fair Credit
+Reporting Act, and I dispute the alleged debt in its entirety.
+
+I prefer to be contacted only in writing at the address above. Do not
+contact me by telephone.
+
+Sincerely,
+
+
+{{ profile.name }}

@@ -81,7 +81,9 @@
     <code>{{ f.evidence | tojson }}</code>
   </p>
   {% endif %}
-  {# Phase 3 surfaces "Generate letter" buttons here #}
+  <p>
+    <a class="accent" href="/letter/{{ f.finding_id }}">Generate letter &rarr;</a>
+  </p>
 </div>
 {% endfor %}
 {% endif %}

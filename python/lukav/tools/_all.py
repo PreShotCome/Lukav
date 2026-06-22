@@ -15,9 +15,10 @@ def build_full_registry() -> ToolRegistry:
 
 
 def _import_modules():
-    from . import plaid_tools, debt_audit, fdcpa_fcra
+    from . import plaid_tools, debt_audit, fdcpa_fcra, legal_research
     return [
         ("plaid", plaid_tools),
         ("debt_audit", debt_audit),
         ("fdcpa_fcra", fdcpa_fcra),
+        ("legal_research", legal_research),
     ]

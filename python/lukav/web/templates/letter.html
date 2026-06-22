@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <strong>{{ finding.title }}</strong>
+  <span class="muted">[{{ finding.severity }} · {{ finding.kind }}]</span>
+  <p class="muted">Template: <code>{{ template_name }}</code></p>
+  <p class="muted">Citation: {{ finding.citation }}</p>
+  <p>
+    <a class="accent" href="/scan/{{ finding.account_id }}">&larr; back to scan</a>
+  </p>
+</div>
+
+{% if not profile_complete %}
+<div class="card">
+  <p class="bad">Set your profile before saving or sending the letter.</p>
+  <p><a class="accent" href="/settings">Open settings &rarr;</a></p>
+</div>
+{% endif %}
+
+{% if review %}
+<div class="card">
+  <strong>AI commentary</strong>
+  <span class="muted">(backend: {{ review.backend }}) — informational</span>
+  <pre style="white-space:pre-wrap">{{ review.commentary }}</pre>
+</div>
+{% endif %}
+
+<div class="card">
+  <strong>Letter preview</strong>
+  <p class="muted">Review before sending. Not legal advice.</p>
+  <pre style="white-space:pre-wrap; background:var(--surface); padding:1rem; border-radius:6px">{{ body }}</pre>
+  <p>
+    <form method="post" action="/letter/{{ finding.finding_id }}/save" style="display:inline">
+      <button type="submit"{% if not profile_complete %} disabled{% endif %}>
+        Save to letters
+      </button>
+    </form>
+    <a class="accent" href="/letter/{{ finding.finding_id }}/text">Download .txt</a>
+  </p>
+</div>
+{% endblock %}
