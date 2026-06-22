@@ -1,0 +1,55 @@
+# CARD Act (Credit Card Accountability Responsibility and Disclosure Act of 2009)
+# Citations: 15 U.S.C. §1601 et seq., 12 CFR Part 1026 (Regulation Z).
+#
+# Caps are CFPB-adjusted annually for inflation; the values below are the
+# 2025-effective caps. Update annually:
+#   - https://www.consumerfinance.gov/rules-policy/regulations/1026/
+#
+# These are read by tools/debt_audit.py — each rule_id maps to a function.
+
+rules:
+  - rule_id: card_act.first_late_fee_cap
+    title: Late fee exceeds first-violation cap
+    citation: 15 USC 1665d; 12 CFR 1026.52(b)(1)(ii)(A)
+    cap_usd: 32.00
+    severity: medium
+    description: >-
+      Under Regulation Z, a credit-card issuer's first late-fee assessment
+      cannot exceed the CFPB-adjusted cap (2025: $32).
+
+  - rule_id: card_act.repeat_late_fee_cap
+    title: Repeat late fee exceeds repeat-violation cap
+    citation: 15 USC 1665d; 12 CFR 1026.52(b)(1)(ii)(B)
+    cap_usd: 43.00
+    severity: medium
+    description: >-
+      Under Regulation Z, repeat late fees (same type of violation within
+      six billing cycles) cannot exceed the CFPB-adjusted cap (2025: $43).
+
+  - rule_id: card_act.over_limit_fee_requires_opt_in
+    title: Over-limit fee without explicit opt-in
+    citation: 15 USC 1637(k); 12 CFR 1026.56
+    severity: high
+    description: >-
+      An issuer may not impose an over-limit fee unless the consumer has
+      affirmatively opted in. If you see an over-limit fee, you can demand
+      proof of opt-in.
+
+  - rule_id: card_act.interest_charge_implied_apr
+    title: Interest charge implies an APR higher than disclosed
+    citation: 15 USC 1637(b); 12 CFR 1026.7(b)(6)
+    tolerance_pct: 1.0
+    severity: medium
+    description: >-
+      Annualizing (interest_charge * 12) / balance_subject_to_apr yielded a
+      rate more than the tolerance above the disclosed APR. The Periodic
+      Statement Rule requires accurate disclosure of the APR applied.
+
+  - rule_id: card_act.over_limit_balance
+    title: Balance exceeds the disclosed credit limit
+    citation: 15 USC 1637(k); 12 CFR 1026.56
+    severity: low
+    description: >-
+      The current balance exceeds the credit limit. Confirm an over-limit
+      opt-in is on file; if not, both the over-limit posting and any
+      associated fee are challengeable.

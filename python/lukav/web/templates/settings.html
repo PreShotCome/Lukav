@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <strong>Profile</strong>
+  <p class="muted">
+    Used as the sender on every dispute letter. Lukav stores this only
+    in the local SQLite DB.
+  </p>
+  <form method="post" action="/settings">
+    <p><label>Full legal name<br>
+      <input name="name" size="40" value="{{ profile.name or '' }}"></label></p>
+    <p><label>Address line 1<br>
+      <input name="address_line1" size="40" value="{{ profile.address_line1 or '' }}"></label></p>
+    <p><label>Address line 2 (optional)<br>
+      <input name="address_line2" size="40" value="{{ profile.address_line2 or '' }}"></label></p>
+    <p><label>City <input name="city" value="{{ profile.city or '' }}"></label>
+       <label>State <input name="state" maxlength="2" value="{{ profile.state or '' }}"></label>
+       <label>ZIP <input name="zip" maxlength="10" value="{{ profile.zip or '' }}"></label></p>
+    <p><button type="submit">Save profile</button></p>
+  </form>
+</div>
+<div class="card">
+  <p class="muted"><a class="accent" href="/">&larr; back to dashboard</a></p>
+</div>
+{% endblock %}

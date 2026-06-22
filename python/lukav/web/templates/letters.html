@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <strong>Letters</strong>
+  <p><a class="accent" href="/">&larr; dashboard</a></p>
+</div>
+{% if not letters %}
+<div class="card"><p class="muted">No letters saved yet.</p></div>
+{% else %}
+{% for l in letters %}
+<div class="card">
+  <strong><a class="accent" href="/letters/{{ l.letter_id }}">{{ l.template }}</a></strong>
+  <span class="muted">· {{ l.created_at }}</span>
+  <p class="muted">finding: <code>{{ l.finding_id }}</code></p>
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}

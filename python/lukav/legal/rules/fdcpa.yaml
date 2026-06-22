@@ -1,0 +1,34 @@
+# Fair Debt Collection Practices Act — 15 U.S.C. §1692 et seq.
+#
+# Most FDCPA rules need information Plaid does NOT expose (collector
+# identity, call logs, written communications). Lukav captures this from
+# the user via the "Manual debt context" form. The rules below run against
+# the union of Plaid data + manual context.
+
+rules:
+  - rule_id: fdcpa.validation_opportunity
+    title: Right to demand debt validation
+    citation: 15 USC 1692g(b)
+    severity: info
+    description: >-
+      Within 30 days of a collector's first written communication you may
+      send a written request for validation. The collector must cease
+      collection until validation is provided. Use validation_request.j2.
+
+  - rule_id: fdcpa.time_barred_debt
+    title: Debt may be past the statute of limitations
+    citation: CFPB 12 CFR 1006.26
+    severity: high
+    description: >-
+      A collector cannot sue or threaten suit on a debt past your state's
+      statute of limitations, and certain communications about time-barred
+      debt must include the CFPB-required disclosure.
+
+  - rule_id: fdcpa.cease_contact
+    title: Right to demand cease-of-contact
+    citation: 15 USC 1692c(c)
+    severity: info
+    description: >-
+      Consumers may demand a collector stop contacting them in writing.
+      After receipt, the collector may only contact to confirm receipt or
+      to notify of specific legal action.

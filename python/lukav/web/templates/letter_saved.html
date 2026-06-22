@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <strong>Saved letter</strong>
+  <span class="muted">{{ letter.created_at }} · template <code>{{ letter.template }}</code></span>
+  <p><a class="accent" href="/letters">&larr; back to letters</a></p>
+</div>
+<div class="card">
+  <pre style="white-space:pre-wrap; background:var(--surface); padding:1rem; border-radius:6px">{{ letter.body }}</pre>
+</div>
+{% endblock %}

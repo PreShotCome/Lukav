@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <p>Linking a credit card via Plaid <code>{{ plaid_env if plaid_env is defined else "" }}</code>.</p>
+  <p class="muted">A Plaid window will open. Sign in with your bank and pick the card you want Lukav to scan.</p>
+  <p><button id="link-btn">Open Plaid Link</button> <span id="status" class="muted"></span></p>
+</div>
+<script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+<script>
+  const linkHandler = Plaid.create({
+    token: "{{ link_token }}",
+    onSuccess: async (public_token, metadata) => {
+      document.getElementById("status").textContent = "Exchanging token…";
+      const form = new FormData();
+      form.append("public_token", public_token);
+      const resp = await fetch("/exchange", { method: "POST", body: form });
+      if (!resp.ok) {
+        const text = await resp.text();
+        document.getElementById("status").innerHTML =
+          '<span class="bad">exchange failed: ' + text + '</span>';
+        return;
+      }
+      window.location.href = "/";
+    },
+    onExit: (err) => {
+      if (err) {
+        document.getElementById("status").innerHTML =
+          '<span class="bad">' + (err.display_message || err.error_message || "Link cancelled") + '</span>';
+      }
+    }
+  });
+  document.getElementById("link-btn").addEventListener("click", () => linkHandler.open());
+</script>
+{% endblock %}
