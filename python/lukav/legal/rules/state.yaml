@@ -1,0 +1,35 @@
+# State-law extensions to federal consumer-protection statutes.
+# Each rule fires only when the user's residence state matches the
+# rule's `applies_to` list.
+
+rules:
+  - rule_id: state.rosenthal_act
+    title: California Rosenthal Act extends FDCPA to original creditors
+    citation: Cal. Civ. Code §1788 et seq.
+    severity: info
+    applies_to: ["CA"]
+    description: >-
+      California's Rosenthal Fair Debt Collection Practices Act
+      incorporates most of the FDCPA's restrictions and — critically —
+      applies them to original creditors collecting their own debts,
+      not just third-party collectors. Cite Rosenthal in addition to
+      the FDCPA when the alleged collector is the original creditor.
+
+  - rule_id: state.nycdcr_reg
+    title: NYC Debt Collector regulations apply
+    citation: NYC Admin. Code §20-489 et seq.
+    severity: info
+    applies_to: ["NY"]
+    description: >-
+      New York City requires debt collectors to register and imposes
+      additional disclosure and conduct rules beyond the FDCPA. Confirm
+      the collector is licensed at the NYC DCWP before any payment.
+
+  - rule_id: state.texas_finance_chapter_392
+    title: Texas Debt Collection Act applies
+    citation: Tex. Fin. Code Ch. 392
+    severity: info
+    applies_to: ["TX"]
+    description: >-
+      Texas extends FDCPA-like restrictions to first-party creditors
+      and provides a private right of action with attorney's fees.

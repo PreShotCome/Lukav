@@ -86,3 +86,32 @@ rules:
       After receipt of a written cease-of-contact demand, the collector
       may only communicate to confirm receipt or to notify of specific
       action. Any other contact is a per-instance violation.
+
+  - rule_id: fdcpa.reg_f_seven_in_seven_calls
+    title: Reg F call-frequency cap exceeded (7-in-7)
+    citation: 12 CFR 1006.14(b)(2)(i)
+    severity: high
+    description: >-
+      Under CFPB Regulation F, a debt collector is presumed to violate
+      §1692d if it places more than 7 telephone calls within a 7-day
+      period regarding a particular debt.
+
+  - rule_id: fdcpa.reg_f_seven_days_after_conversation
+    title: Phone contact within 7 days of a prior telephone conversation
+    citation: 12 CFR 1006.14(b)(2)(ii)
+    severity: high
+    description: >-
+      Under Regulation F, a debt collector is presumed to violate §1692d
+      if it speaks with the consumer by phone about a particular debt
+      and then contacts the consumer by phone again within 7 days about
+      that same debt.
+
+  - rule_id: fdcpa.mini_miranda_required
+    title: Mini-Miranda disclosure missing from initial communication
+    citation: 15 USC 1692e(11)
+    severity: medium
+    description: >-
+      The initial written communication and each subsequent
+      communication must disclose that the collector is attempting to
+      collect a debt and that any information will be used for that
+      purpose. Omission is a §1692e(11) violation.

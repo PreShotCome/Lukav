@@ -62,6 +62,14 @@
       <label><input type="checkbox" name="called_at_workplace" value="1"> called at workplace</label>
       <label><input type="checkbox" name="after_cease_demand" value="1"> after I sent cease demand</label>
     </p>
+    <p>
+      <label>Mini-Miranda disclosure (only matters on letters/emails)
+        <select name="mini_miranda_present">
+          <option value="unknown">unknown</option>
+          <option value="yes">yes — disclosure present</option>
+          <option value="no">no — disclosure missing</option>
+        </select></label>
+    </p>
     <p><button type="submit">Add communication</button></p>
   </form>
   {% if communications %}

@@ -10,46 +10,50 @@
 rules:
   - rule_id: card_act.first_late_fee_cap
     title: Late fee exceeds first-violation cap
-    citation: 15 USC 1665d; 12 CFR 1026.52(b)(1)(ii)(A)
+    citation: 15 USC 1665d (TILA §149); 12 CFR 1026.52(b)(1)(ii)(A)
     cap_usd: 32.00
     severity: medium
     description: >-
-      Under Regulation Z, a credit-card issuer's first late-fee assessment
-      cannot exceed the CFPB-adjusted cap (2025: $32).
+      Under Regulation Z (12 CFR Part 1026), a credit-card issuer's first
+      late-fee assessment cannot exceed the CFPB-adjusted safe-harbor cap
+      (2025: $32). Caps are republished annually at 12 CFR 1026.52(b)(1)(ii).
 
   - rule_id: card_act.repeat_late_fee_cap
     title: Repeat late fee exceeds repeat-violation cap
-    citation: 15 USC 1665d; 12 CFR 1026.52(b)(1)(ii)(B)
+    citation: 15 USC 1665d (TILA §149); 12 CFR 1026.52(b)(1)(ii)(B)
     cap_usd: 43.00
     severity: medium
     description: >-
-      Under Regulation Z, repeat late fees (same type of violation within
-      six billing cycles) cannot exceed the CFPB-adjusted cap (2025: $43).
+      Under Regulation Z (12 CFR Part 1026), repeat late fees (same type
+      of violation within six billing cycles) cannot exceed the
+      CFPB-adjusted safe-harbor cap (2025: $43).
 
   - rule_id: card_act.over_limit_fee_requires_opt_in
     title: Over-limit fee without explicit opt-in
-    citation: 15 USC 1637(k); 12 CFR 1026.56
+    citation: 15 USC 1637(k) (TILA §127); 12 CFR 1026.56(b)
     severity: high
     description: >-
       An issuer may not impose an over-limit fee unless the consumer has
-      affirmatively opted in. If you see an over-limit fee, you can demand
-      proof of opt-in.
+      affirmatively opted in to over-limit transactions (12 CFR 1026.56(b))
+      and the issuer has provided the disclosures required by §1026.56(c)
+      and (e). If you see an over-limit fee, demand proof of opt-in.
 
   - rule_id: card_act.interest_charge_implied_apr
     title: Interest charge implies an APR higher than disclosed
-    citation: 15 USC 1637(b); 12 CFR 1026.7(b)(6)
+    citation: 15 USC 1637(b) (TILA §127); 12 CFR 1026.7(b)(6) (Periodic Statement Rule)
     tolerance_pct: 1.0
     severity: medium
     description: >-
-      Annualizing (interest_charge * 12) / balance_subject_to_apr yielded a
-      rate more than the tolerance above the disclosed APR. The Periodic
-      Statement Rule requires accurate disclosure of the APR applied.
+      Annualizing (interest_charge × 12) / balance_subject_to_apr yielded
+      a rate more than the tolerance above the disclosed APR. The Periodic
+      Statement Rule requires accurate disclosure of the APR(s) applied
+      and the balances to which they were applied.
 
   - rule_id: card_act.over_limit_balance
     title: Balance exceeds the disclosed credit limit
-    citation: 15 USC 1637(k); 12 CFR 1026.56
+    citation: 15 USC 1637(k) (TILA §127); 12 CFR 1026.56
     severity: low
     description: >-
       The current balance exceeds the credit limit. Confirm an over-limit
-      opt-in is on file; if not, both the over-limit posting and any
-      associated fee are challengeable.
+      opt-in is on file (12 CFR 1026.56(b)); without it both the
+      over-limit posting and any associated fee are challengeable.
