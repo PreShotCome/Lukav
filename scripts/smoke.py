@@ -90,6 +90,41 @@ def main() -> int:
     assert resp.status_code == 200
     assert "billing_error_notice.j2" in resp.text
 
+    # 7. Phase 4: manual collection account + comms + scan + letter.
+    long_ago_8y = (date.today() - timedelta(days=365 * 8)).isoformat()
+    resp = client.post("/collections", data={
+        "collector_name": "Midland Credit Management",
+        "collector_address": "350 Camino de la Reina",
+        "original_creditor": "Capital One",
+        "alleged_amount": "1234.56",
+        "status": "in_collection",
+        "first_contact_date": date.today().isoformat(),
+        "last_activity_date": long_ago_8y,
+        "state": "TX",
+        "account_mask": "4242",
+    }, follow_redirects=False)
+    assert resp.status_code == 303
+    coll_id = resp.headers["location"].rsplit("/", 1)[-1]
+
+    client.post(f"/collections/{coll_id}/communication", data={
+        "kind": "phone",
+        "occurred_at": "2025-06-12T22:30",
+        "summary": "Threatened suit",
+        "threat_of_suit": "1",
+    })
+    client.post(f"/collections/{coll_id}/scan")
+
+    resp = client.get(f"/collections/{coll_id}")
+    assert resp.status_code == 200
+    for needle in ("Midland", "time-barred", "outside"):
+        assert needle.lower() in resp.text.lower(), f"missing {needle!r}"
+
+    resp = client.post(
+        f"/collections/{coll_id}/letter/pay_for_delete.j2/save",
+        data={"finding_id": ""}, follow_redirects=False,
+    )
+    assert resp.status_code == 303
+
     print("smoke OK")
     return 0
 

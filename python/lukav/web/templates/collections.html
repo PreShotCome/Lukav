@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <strong>Collections</strong>
+  <p class="muted">
+    Debts that aren't visible to Plaid — collectors, debt buyers,
+    charge-offs. Adding one here lets Lukav audit collector behavior
+    (call timing, third-party disclosure, time-barred threats) and
+    generate validation, cease-contact, pay-for-delete, and
+    goodwill letters.
+  </p>
+  <p><a class="accent" href="/collections/new">+ Add a collection</a></p>
+</div>
+
+{% if not collections %}
+<div class="card"><p class="muted">No collection accounts yet.</p></div>
+{% else %}
+{% for c in collections %}
+<div class="card">
+  <strong><a class="accent" href="/collections/{{ c.collection_id }}">
+    {{ c.collector_name or "(no collector name)" }}
+  </a></strong>
+  <span class="muted">[{{ c.status }}]</span>
+  <p class="muted">
+    Original creditor: {{ c.original_creditor or "(unknown)" }}
+    · Alleged ${{ "%.2f" % c.alleged_amount }}
+    {% if c.state %}· State: {{ c.state }}{% endif %}
+    {% if c.last_activity_date %}· Last activity: {{ c.last_activity_date }}{% endif %}
+  </p>
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}

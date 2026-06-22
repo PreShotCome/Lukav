@@ -1,0 +1,36 @@
+{% include "_letterhead.j2" %}
+
+Re: Request for validation of debt
+Original creditor: {{ collection.original_creditor or "(not yet disclosed)" }}
+Alleged amount: ${{ "%.2f" % collection.alleged_amount }}
+{% if collection.account_mask %}Original account ending: {{ collection.account_mask }}
+{% endif %}{% if collection.first_contact_date %}First contact: {{ collection.first_contact_date }}
+{% endif %}
+
+To {{ collection.collector_name or "the collection agency" }},
+
+This is a written request, made pursuant to 15 U.S.C. §1692g(b), for
+validation of the debt referenced above. I do not waive any rights
+under the FDCPA or FCRA. Until you have validated this debt in writing,
+you must cease all collection activity.
+
+Please provide all of the following:
+
+  1. The name and address of the original creditor.
+  2. Verification of the debt — copies of the original signed
+     application or contract, statements showing how the alleged
+     amount was calculated, and any assignment-of-debt or
+     bill-of-sale documentation establishing your authority to
+     collect.
+  3. The date of last activity on the account and the date of first
+     delinquency, as reported to consumer reporting agencies.
+  4. Confirmation that the debt is within {{ collection.state or "my state" }}'s
+     statute of limitations for collection.
+
+I prefer to be contacted only in writing at the address above. Do not
+contact me by telephone, at my workplace, or through any third party.
+
+Sincerely,
+
+
+{{ profile.name }}

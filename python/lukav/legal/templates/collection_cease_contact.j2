@@ -1,0 +1,32 @@
+{% include "_letterhead.j2" %}
+
+Re: Cease-of-contact demand under 15 U.S.C. §1692c(c)
+Collector: {{ collection.collector_name or "the collection agency" }}
+Original creditor: {{ collection.original_creditor or "(unknown)" }}
+Alleged amount: ${{ "%.2f" % collection.alleged_amount }}
+
+To whom it may concern,
+
+Pursuant to 15 U.S.C. §1692c(c), I am notifying you in writing that
+you must stop communicating with me regarding the above-referenced
+debt. After receipt of this letter you may contact me only to:
+
+  (1) advise me that further efforts are being terminated; or
+  (2) notify me that you may invoke a specified remedy that you
+      ordinarily invoke; or
+  (3) notify me that you intend to invoke a specified remedy.
+
+Any other communication — by phone, text, email, or in person, to me
+or to any third party — will be treated as a per-instance violation
+of the FDCPA and reported to the Consumer Financial Protection
+Bureau, the Federal Trade Commission, and the attorney general of
+{{ profile.state or collection.state or "my state" }}.
+
+I do not waive any right to dispute the alleged debt under §1692g
+or to dispute the reporting of this debt under the Fair Credit
+Reporting Act.
+
+Sincerely,
+
+
+{{ profile.name }}

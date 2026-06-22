@@ -1,0 +1,48 @@
+{% include "_letterhead.j2" %}
+
+Re: Settlement and pay-for-delete proposal
+Collector: {{ collection.collector_name or "the collection agency" }}
+Original creditor: {{ collection.original_creditor or "(unknown)" }}
+Alleged amount: ${{ "%.2f" % collection.alleged_amount }}
+{% if collection.account_mask %}Original account ending: {{ collection.account_mask }}
+{% endif %}
+
+To whom it may concern,
+
+Without admitting liability for the above-referenced debt, I am
+offering to settle it on the following terms, conditioned in full on
+your written agreement before any payment is made:
+
+  1. I will pay $___________ (a partial amount of the alleged
+     balance) by cashier's check or money order, within fifteen (15)
+     days of receipt of your countersigned agreement.
+
+  2. In exchange, your organization will:
+       (a) accept the payment as full and final settlement of the
+           above-referenced debt;
+       (b) cease all collection activity related to this debt;
+       (c) instruct each consumer reporting agency to which you have
+           reported this debt to delete the tradeline in its
+           entirety — not simply mark it "paid" or "settled" — under
+           your authority as a furnisher (15 U.S.C. §1681s-2);
+       (d) confirm in writing that you will not sell, assign, or
+           transfer this debt to any other party.
+
+  3. This letter is not an acknowledgement of the debt, does not
+     waive any defense, and does not restart any statute of
+     limitations under any applicable state or federal law.
+
+If these terms are acceptable, please countersign below and return a
+copy to me at the address above. If you cannot accept, please respond
+in writing with the specific terms you would accept.
+
+Sincerely,
+
+
+{{ profile.name }}
+
+
+Accepted on behalf of {{ collection.collector_name or "the collector" }}:
+
+________________________________   Date: __________
+Name / title

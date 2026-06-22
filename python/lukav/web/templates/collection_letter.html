@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <strong>{{ template_name }}</strong>
+  <span class="muted">→ {{ collection.collector_name }}</span>
+  <p><a class="accent" href="/collections/{{ collection.collection_id }}">&larr; back to collection</a></p>
+</div>
+
+{% if not profile_complete %}
+<div class="card">
+  <p class="bad">Set your profile before saving or sending.</p>
+  <p><a class="accent" href="/settings">Open settings &rarr;</a></p>
+</div>
+{% endif %}
+
+<div class="card">
+  <pre style="white-space:pre-wrap; background:var(--surface); padding:1rem; border-radius:6px">{{ body }}</pre>
+  <p>
+    <form method="post"
+          action="/collections/{{ collection.collection_id }}/letter/{{ template_name }}/save"
+          style="display:inline">
+      <input type="hidden" name="finding_id" value="{{ finding_id }}">
+      <button type="submit"{% if not profile_complete %} disabled{% endif %}>
+        Save to letters
+      </button>
+    </form>
+    <a class="accent"
+       href="/collections/{{ collection.collection_id }}/letter/{{ template_name }}/text{% if finding_id %}?finding_id={{ finding_id }}{% endif %}">
+      Download .txt
+    </a>
+  </p>
+</div>
+{% endblock %}
