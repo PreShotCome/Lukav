@@ -55,8 +55,11 @@ class ClaudeCliClient(LlmClient):
         except subprocess.TimeoutExpired:
             raise RuntimeError(f"claude CLI timed out after {self.timeout}s")
         if result.returncode != 0:
+            stderr = (result.stderr or "").strip()
+            stdout = (result.stdout or "").strip()
+            details = stderr or stdout or "(no output from claude CLI)"
             raise RuntimeError(
-                f"claude CLI exit {result.returncode}: {result.stderr[:500]}"
+                f"claude CLI exit {result.returncode}: {details[:2000]}"
             )
         return ChatMessage(role="assistant", content=(result.stdout or "").strip())
 

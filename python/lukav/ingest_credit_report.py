@@ -24,33 +24,65 @@ from lukav.llm import ChatMessage, build_default_client
 
 
 SYSTEM_PROMPT = (
-    "You are a strict JSON extractor. You will be given the text of a "
-    "consumer credit report (from Equifax, Experian, or TransUnion). "
-    "Extract EVERY negative tradeline relevant to debt collection or "
-    "credit repair: collection accounts, charge-offs, accounts in "
-    "dispute, accounts sold to debt buyers, accounts past due, and "
-    "accounts flagged for repossession or bankruptcy. SKIP accounts "
-    "shown as current / never late / paid in full / closed in good "
-    "standing — those don't help the user.\n\n"
+    "You are a strict JSON extractor. You will be given a CHUNK of "
+    "text from a consumer credit report. Extract every negative "
+    "tradeline that APPEARS IN THIS CHUNK: collection accounts, "
+    "charge-offs, accounts in dispute, accounts sold to debt buyers, "
+    "accounts past due, and accounts flagged for repossession or "
+    "bankruptcy. SKIP accounts shown as current / never late / paid "
+    "in full / closed in good standing.\n\n"
+    "HARD RULES — read carefully:\n"
+    "  - Use ONLY values that appear verbatim in the input. If a field "
+    "is not present in the text, use empty string / 0 / null.\n"
+    "  - Do NOT infer amounts from balance ranges. Do NOT guess dates. "
+    "Do NOT invent collector or creditor names from common-sounding "
+    "ones. If you are unsure, return empty.\n"
+    "  - If this chunk contains NO negative tradelines, return [].\n\n"
     "Respond with one compact JSON array — no prose before or after, "
-    "no markdown fences. Each element MUST match this shape "
-    "(use empty string / 0 / null when unsure):\n\n"
+    "no markdown fences. Each element MUST match this shape:\n\n"
     "[\n"
     "  {\n"
-    '    "collector_name": "",         // current creditor/collector on this tradeline\n'
-    '    "original_creditor": "",      // OC if disclosed; "" otherwise\n'
-    '    "alleged_amount": 0,          // balance the tradeline shows\n'
-    '    "account_mask": "",           // last 4 of account number if visible\n'
-    '    "date_opened": null,          // YYYY-MM-DD or null\n'
-    '    "date_of_first_delinquency": null,  // YYYY-MM-DD or null — needed for §1681c math\n'
-    '    "last_activity_date": null,   // YYYY-MM-DD or null\n'
-    '    "status": "in_collection",     // in_collection | charged_off | sold | disputed | settled | paid | removed\n'
-    '    "bureau": "",                  // Equifax | Experian | TransUnion (if identifiable)\n'
-    '    "notes": ""                    // anything else that matters: dispute history, comments, etc.\n'
+    '    "collector_name": "",\n'
+    '    "original_creditor": "",\n'
+    '    "alleged_amount": 0,\n'
+    '    "account_mask": "",\n'
+    '    "date_opened": null,\n'
+    '    "date_of_first_delinquency": null,\n'
+    '    "last_activity_date": null,\n'
+    '    "status": "in_collection",\n'
+    '    "bureau": "",\n'
+    '    "notes": ""\n'
     "  }\n"
-    "]\n\n"
-    "Return [] if there are no negative tradelines."
+    "]\n"
 )
+
+
+CHUNK_SIZE = 6000           # chars per LLM call
+CHUNK_OVERLAP = 400         # carry tail into next chunk to catch table-boundary tradelines
+
+
+def _chunk_text(text: str) -> list[str]:
+    """Split the report into overlapping ~6k-char chunks. Prefers
+    breaking at blank lines so a single tradeline doesn't get split."""
+    text = text.strip()
+    if len(text) <= CHUNK_SIZE:
+        return [text]
+    chunks: list[str] = []
+    i = 0
+    while i < len(text):
+        end = min(i + CHUNK_SIZE, len(text))
+        if end < len(text):
+            # Back up to the last blank-line break if there's one within
+            # the trailing 800 chars; otherwise hard-cut.
+            window = text[end - 800:end]
+            break_at = window.rfind("\n\n")
+            if break_at >= 0:
+                end = end - 800 + break_at
+        chunks.append(text[i:end])
+        if end >= len(text):
+            break
+        i = max(end - CHUNK_OVERLAP, i + 1)
+    return chunks
 
 
 @dataclass
@@ -76,8 +108,31 @@ class CreditReportExtraction:
 
 
 def extract_text_from_pdf(data: bytes) -> str:
-    """Same approach as ingest.extract_text_from_pdf but kept here so
-    credit-report ingest stands alone."""
+    """Try pdfplumber first (table-aware), fall back to pypdf. Returns
+    empty string if both fail."""
+    text = _extract_with_pdfplumber(data)
+    if text:
+        return text
+    return _extract_with_pypdf(data)
+
+
+def _extract_with_pdfplumber(data: bytes) -> str:
+    try:
+        import pdfplumber
+    except ImportError:
+        return ""
+    try:
+        with pdfplumber.open(io.BytesIO(data)) as pdf:
+            parts: list[str] = []
+            for page in pdf.pages:
+                t = page.extract_text(x_tolerance=2, y_tolerance=2) or ""
+                parts.append(t)
+        return "\n".join(parts).strip()
+    except Exception:
+        return ""
+
+
+def _extract_with_pypdf(data: bytes) -> str:
     try:
         from pypdf import PdfReader
     except ImportError:
@@ -136,32 +191,102 @@ def extract_credit_report(text: str, *,
                      "hand using /collections/new.")
         return out
     out.backend = client.__class__.__name__
-    try:
-        msg = client.chat(
-            messages=[
-                ChatMessage(role="system", content=SYSTEM_PROMPT),
-                ChatMessage(role="user", content=text[:60000]),
-            ],
-            temperature=0.0,
-        )
-    except Exception as e:
-        out.backend = "error"
-        out.error = f"LLM call failed: {e}"
-        return out
 
-    raw = msg.content.strip()
-    # Tolerate fences + leading prose.
+    chunks = _chunk_text(text)
+    raw_lower = text.lower()
+    seen_keys: set[tuple[str, str]] = set()
+    errors: list[str] = []
+    ungrounded_dropped = 0
+
+    for idx, chunk in enumerate(chunks):
+        try:
+            msg = client.chat(
+                messages=[
+                    ChatMessage(role="system", content=SYSTEM_PROMPT),
+                    ChatMessage(
+                        role="user",
+                        content=f"[chunk {idx + 1} of {len(chunks)}]\n\n{chunk}",
+                    ),
+                ],
+                temperature=0.0,
+            )
+        except Exception as e:
+            errors.append(f"chunk {idx + 1}: {e}")
+            continue
+
+        data = _parse_first_array(msg.content)
+        if data is None:
+            errors.append(
+                f"chunk {idx + 1}: LLM did not return a JSON array."
+            )
+            continue
+
+        for d in data:
+            if not isinstance(d, dict):
+                continue
+            tradeline = _coerce_tradeline(d)
+            if not _is_grounded(tradeline, text, raw_lower):
+                ungrounded_dropped += 1
+                continue
+            key = (
+                tradeline.collector_name.lower().strip(),
+                tradeline.account_mask or "",
+            )
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            out.tradelines.append(tradeline)
+
+    if errors:
+        out.error = " | ".join(errors[:3])
+    if ungrounded_dropped:
+        suffix = f"{ungrounded_dropped} row(s) dropped as ungrounded."
+        out.error = (out.error + " " + suffix) if out.error else suffix
+    return out
+
+
+def _is_grounded(tradeline: "Tradeline", text: str, raw_lower: str) -> bool:
+    """A tradeline is grounded when:
+      - collector_name has at least one significant token (>=4 chars),
+        AND a sufficient fraction of those tokens appear verbatim in the
+        source text (case-insensitive). Tolerates abbreviation ("MGMT"
+        vs "Management") because the rest of the name usually matches.
+      - if alleged_amount is nonzero, the amount appears in the text
+        as either "1234.56" or "1234".
+    """
+    if not tradeline.collector_name:
+        return False
+    tokens = [t.lower() for t in re.split(r"\W+", tradeline.collector_name)
+              if len(t) >= 4]
+    if not tokens:
+        return False
+    matches = sum(1 for t in tokens if t in raw_lower)
+    required = 1 if len(tokens) == 1 else 2
+    if matches < required:
+        return False
+    if tradeline.alleged_amount > 0:
+        # Credit reports print amounts as "$1,234.56" — strip commas before
+        # matching so the comma'd form grounds fine.
+        text_nocommas = text.replace(",", "")
+        amount_str = f"{tradeline.alleged_amount:.2f}"
+        if (amount_str not in text_nocommas
+                and f"{int(tradeline.alleged_amount)}" not in text_nocommas):
+            return False
+    return True
+
+
+def _parse_first_array(text: str) -> Optional[list]:
+    raw = (text or "").strip()
+    if not raw:
+        return None
     if raw.startswith("```"):
         m = re.search(r"```(?:json)?\s*(\[[\s\S]*?\])\s*```", raw)
         if m:
             raw = m.group(1)
-    # Find first balanced [...].
     start = raw.find("[")
     if start < 0:
-        out.error = f"LLM did not return a JSON array. Raw:\n{msg.content[:1500]}"
-        return out
+        return None
     depth = 0
-    end = -1
     for i in range(start, len(raw)):
         c = raw[i]
         if c == "[":
@@ -169,21 +294,11 @@ def extract_credit_report(text: str, *,
         elif c == "]":
             depth -= 1
             if depth == 0:
-                end = i + 1
-                break
-    if end < 0:
-        out.error = "Unterminated JSON array from LLM."
-        return out
-    try:
-        data = json.loads(raw[start:end])
-    except json.JSONDecodeError as e:
-        out.error = f"JSON parse failed: {e}"
-        return out
-    if not isinstance(data, list):
-        out.error = "LLM JSON was not a list."
-        return out
-    out.tradelines = [_coerce_tradeline(d) for d in data if isinstance(d, dict)]
-    return out
+                try:
+                    return json.loads(raw[start:i + 1])
+                except json.JSONDecodeError:
+                    return None
+    return None
 
 
 def ingest_credit_report(data: bytes, filename: str,

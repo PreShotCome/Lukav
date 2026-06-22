@@ -86,6 +86,28 @@ def test_extract_credit_report_parses_array():
     assert result.tradelines[1].status == "charged_off"
 
 
+def test_extract_drops_hallucinated_collectors():
+    """Grounding check: collector names not in the source text are dropped."""
+    fake = FakeLLM([
+        {"collector_name": "Midland Credit Management",
+         "original_creditor": "Capital One",
+         "alleged_amount": 1234.56, "account_mask": "4242",
+         "date_opened": None, "date_of_first_delinquency": None,
+         "last_activity_date": None,
+         "status": "in_collection", "bureau": "", "notes": ""},
+        {"collector_name": "Definitely Not Real Recovery LLC",
+         "original_creditor": "", "alleged_amount": 999.99,
+         "account_mask": "", "date_opened": None,
+         "date_of_first_delinquency": None, "last_activity_date": None,
+         "status": "in_collection", "bureau": "", "notes": ""},
+    ])
+    result = extract_credit_report(SAMPLE_REPORT_TEXT, llm_client=fake)
+    names = {t.collector_name for t in result.tradelines}
+    assert "Midland Credit Management" in names
+    assert "Definitely Not Real Recovery LLC" not in names
+    assert "ungrounded" in (result.error or "")
+
+
 def test_extract_credit_report_handles_garbage_json():
     fake = FakeLLM("sorry, I cannot extract")
     result = extract_credit_report(SAMPLE_REPORT_TEXT, llm_client=fake)
@@ -95,25 +117,27 @@ def test_extract_credit_report_handles_garbage_json():
 
 def test_extract_credit_report_with_fences():
     fake = FakeLLM(
-        '```json\n[{"collector_name": "X", "alleged_amount": 0, '
-        '"original_creditor": "", "account_mask": "", "date_opened": null, '
-        '"date_of_first_delinquency": null, "last_activity_date": null, '
-        '"status": "in_collection", "bureau": "", "notes": ""}]\n```'
+        '```json\n[{"collector_name": "Midland Credit Management", '
+        '"alleged_amount": 0, "original_creditor": "", "account_mask": "", '
+        '"date_opened": null, "date_of_first_delinquency": null, '
+        '"last_activity_date": null, "status": "in_collection", '
+        '"bureau": "", "notes": ""}]\n```'
     )
     result = extract_credit_report(SAMPLE_REPORT_TEXT, llm_client=fake)
     assert len(result.tradelines) == 1
-    assert result.tradelines[0].collector_name == "X"
+    assert result.tradelines[0].collector_name == "Midland Credit Management"
 
 
 def test_status_outside_enum_coerced_to_default():
     fake = FakeLLM([{
-        "collector_name": "Y", "original_creditor": "", "alleged_amount": 0,
+        "collector_name": "Midland Credit Management",
+        "original_creditor": "", "alleged_amount": 0,
         "account_mask": "", "date_opened": None,
         "date_of_first_delinquency": None, "last_activity_date": None,
         "status": "weird-status-from-llm",
         "bureau": "", "notes": "",
     }])
-    result = extract_credit_report("text", llm_client=fake)
+    result = extract_credit_report(SAMPLE_REPORT_TEXT, llm_client=fake)
     assert result.tradelines[0].status == "in_collection"
 
 
