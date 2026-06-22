@@ -41,8 +41,13 @@ def build_default_client(
         from .claude_client import ClaudeCliClient, _claude_available
         if not _claude_available():
             return None
+        # Default to None so the CLI picks its own current model.
+        # Hardcoding a specific name (e.g. claude-opus-4-7) caused
+        # "claude CLI exit 1" on older / newer CLI installs that didn't
+        # recognize that exact id. CLAUDE_MODEL env still lets the user
+        # pin one.
         return ClaudeCliClient(
-            model=model or os.environ.get("CLAUDE_MODEL") or "claude-opus-4-7"
+            model=model or os.environ.get("CLAUDE_MODEL") or None
         )
     if backend == "ollama":
         from .ollama_client import OllamaClient
