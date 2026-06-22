@@ -1,0 +1,24 @@
+# Fair Credit Reporting Act — 15 U.S.C. §1681 et seq.
+#
+# Most FCRA rules need the user's credit report, which Plaid does not
+# provide. Phase 2 implements only the opportunities detectable from
+# Plaid + manual context.
+
+rules:
+  - rule_id: fcra.bureau_dispute_opportunity
+    title: Bureau dispute right under §611
+    citation: 15 USC 1681i
+    severity: info
+    description: >-
+      You may dispute inaccurate or incomplete information directly with a
+      consumer reporting agency. The CRA must investigate within 30 days
+      (45 if you provide additional information during the investigation).
+
+  - rule_id: fcra.direct_furnisher_dispute
+    title: Direct dispute right under §623(a)(8)
+    citation: 15 USC 1681s-2
+    severity: info
+    description: >-
+      You may dispute inaccurate information directly with the furnisher
+      that reported it. The furnisher must conduct a reasonable
+      investigation and report the results.

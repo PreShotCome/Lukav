@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <strong>{{ account.name }}</strong>
+  <span class="muted">•{{ account.mask or '?' }}</span>
+  <p>
+    <a class="accent" href="/account/{{ account.account_id }}">&larr; back to account</a>
+    ·
+    <form method="post" action="/scan/{{ account.account_id }}" style="display:inline">
+      <button type="submit">Run scan</button>
+    </form>
+  </p>
+</div>
+
+<div class="card">
+  <strong>Manual debt context</strong>
+  <p class="muted">
+    Lukav uses this to flag FDCPA / FCRA opportunities Plaid can't infer
+    on its own. Everything is optional.
+  </p>
+  <form method="post" action="/scan/{{ account.account_id }}/context">
+    <p>
+      <label>State (2-letter):
+        <input name="state" maxlength="2" value="{{ context.get('state') or '' }}">
+      </label>
+    </p>
+    <p>
+      <label>Last activity date (YYYY-MM-DD):
+        <input name="last_activity_date" value="{{ context.get('last_activity_date') or '' }}">
+      </label>
+    </p>
+    <p>
+      <label>
+        <input type="checkbox" name="collection_letter_received" value="1"
+               {% if context.get('collection_letter_received') %}checked{% endif %}>
+        I received a collection letter on this debt
+      </label>
+    </p>
+    <p>
+      <label>Collection letter date (YYYY-MM-DD):
+        <input name="collection_letter_date" value="{{ context.get('collection_letter_date') or '' }}">
+      </label>
+    </p>
+    <p>
+      <label>Basis to dispute how it's reported (one line):
+        <input name="credit_report_dispute_basis" size="60" value="{{ context.get('credit_report_dispute_basis') or '' }}">
+      </label>
+    </p>
+    <p><button type="submit">Save context</button></p>
+  </form>
+</div>
+
+{% if not findings %}
+<div class="card">
+  <p class="muted">No findings yet. Run a scan above to populate this page.</p>
+</div>
+{% else %}
+<div class="card">
+  <strong>Findings ({{ findings|length }})</strong>
+  <p class="muted">
+    Informational. Not legal advice — review every citation before relying on it.
+  </p>
+</div>
+{% for f in findings %}
+<div class="card">
+  <div>
+    <strong>{{ f.title }}</strong>
+    <span class="{% if f.severity == 'high' %}bad{% elif f.severity == 'medium' %}accent{% else %}muted{% endif %}">
+      [{{ f.severity }}]
+    </span>
+    <span class="muted">· {{ f.kind }}</span>
+  </div>
+  <p>{{ f.description }}</p>
+  <p class="muted">
+    <strong>Citation:</strong> {{ f.citation }}
+    · <strong>Rule:</strong> <code>{{ f.rule_id }}</code>
+  </p>
+  {% if f.evidence %}
+  <p class="muted">
+    <strong>Evidence:</strong>
+    <code>{{ f.evidence | tojson }}</code>
+  </p>
+  {% endif %}
+  {# Phase 3 surfaces "Generate letter" buttons here #}
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}

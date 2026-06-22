@@ -16,6 +16,9 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from lukav.audit_engine import (
+    init_findings, list_findings, load_context, save_context, scan_account,
+)
 from lukav.plaid_client import PlaidClient, PlaidLike, default_window
 from lukav.models.debt_models import Item
 from lukav.storage import db
@@ -35,6 +38,7 @@ def create_app(plaid: Optional[PlaidLike] = None) -> FastAPI:
         app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
     db.init_db()
+    init_findings()
     plaid_client: PlaidLike = plaid or PlaidClient()
 
     # ---- core ---------------------------------------------------------
@@ -135,6 +139,55 @@ def create_app(plaid: Optional[PlaidLike] = None) -> FastAPI:
     @app.get("/relink/{item_id}")
     def relink(item_id: str):
         return RedirectResponse(url=f"/link?item_id={item_id}")
+
+    # ---- scan ---------------------------------------------------------
+
+    @app.get("/scan/{account_id}", response_class=HTMLResponse)
+    def scan_page(account_id: str, request: Request):
+        account = db.get_account(account_id)
+        if not account:
+            raise HTTPException(status_code=404, detail="account not found")
+        findings = list_findings(account_id)
+        context = load_context(account_id)
+        return templates.TemplateResponse(
+            request, "scan.html",
+            {
+                "title": f"Scan — {account.name}",
+                "account": account,
+                "findings": findings,
+                "context": context,
+            },
+        )
+
+    @app.post("/scan/{account_id}", response_class=RedirectResponse)
+    def scan_run(account_id: str):
+        account = db.get_account(account_id)
+        if not account:
+            raise HTTPException(status_code=404, detail="account not found")
+        scan_account(account_id)
+        return RedirectResponse(url=f"/scan/{account_id}", status_code=303)
+
+    @app.post("/scan/{account_id}/context", response_class=RedirectResponse)
+    def scan_context_save(
+        account_id: str,
+        state: str = Form(""),
+        last_activity_date: str = Form(""),
+        collection_letter_received: str = Form(""),
+        collection_letter_date: str = Form(""),
+        credit_report_dispute_basis: str = Form(""),
+    ):
+        account = db.get_account(account_id)
+        if not account:
+            raise HTTPException(status_code=404, detail="account not found")
+        payload = {
+            "state": state.strip().upper() or None,
+            "last_activity_date": last_activity_date.strip() or None,
+            "collection_letter_received": bool(collection_letter_received),
+            "collection_letter_date": collection_letter_date.strip() or None,
+            "credit_report_dispute_basis": credit_report_dispute_basis.strip() or None,
+        }
+        save_context(account_id, payload)
+        return RedirectResponse(url=f"/scan/{account_id}", status_code=303)
 
     return app
 
