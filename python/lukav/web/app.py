@@ -11,7 +11,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, Form, HTTPException, Request
+from fastapi import FastAPI, Form, HTTPException, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -31,6 +31,10 @@ from lukav.collections_engine import (
 from lukav.dispute_engine import (
     get_letter, get_profile, init_letters, list_letters, render_letter,
     save_letter, save_profile, template_for,
+)
+from lukav.ingest import (
+    ExtractedLetter, ingest, ingest_text, to_collection_payload,
+    to_communication_payload,
 )
 from lukav.plaid_client import PlaidClient, PlaidLike, default_window
 from lukav.models.debt_models import Item
@@ -483,6 +487,106 @@ def create_app(plaid: Optional[PlaidLike] = None) -> FastAPI:
                     f'attachment; filename="lukav-{safe_name}-{coll_id}.txt"',
             },
         )
+
+    # ---- ingest (PDF / image / paste -> collection or communication) ----
+
+    @app.get("/ingest", response_class=HTMLResponse)
+    def ingest_form(request: Request):
+        return templates.TemplateResponse(
+            request, "ingest_form.html",
+            {"title": "Ingest letter", "collection": None,
+             "collections": list_collections()},
+        )
+
+    @app.post("/ingest", response_class=HTMLResponse)
+    async def ingest_submit(request: Request,
+                            collection_id: str = Form(""),
+                            state: str = Form(""),
+                            pasted_text: str = Form(""),
+                            file: Optional[UploadFile] = File(None)):
+        result: ExtractedLetter
+        if file is not None and file.filename:
+            data = await file.read()
+            result = ingest(data, file.filename)
+        else:
+            result = ingest_text(pasted_text)
+        return templates.TemplateResponse(
+            request, "ingest_preview.html",
+            {
+                "title": "Ingest preview",
+                "result": result,
+                "raw_text": result.raw_text,
+                "collection_id": collection_id or "",
+                "state": state.strip().upper(),
+                "collections": list_collections(),
+            },
+        )
+
+    @app.post("/ingest/save", response_class=RedirectResponse)
+    def ingest_save(
+        action: str = Form(...),
+        collection_id: str = Form(""),
+        state: str = Form(""),
+        collector_name: str = Form(""),
+        collector_address: str = Form(""),
+        original_creditor: str = Form(""),
+        alleged_amount: str = Form("0"),
+        letter_date: str = Form(""),
+        summary: str = Form(""),
+        threat_of_suit: str = Form(""),
+        time_bar_disclosure: str = Form(""),
+    ):
+        letter = ExtractedLetter(
+            collector_name=collector_name.strip(),
+            collector_address=collector_address.strip(),
+            original_creditor=original_creditor.strip(),
+            alleged_amount=float(alleged_amount or 0),
+            letter_date=letter_date.strip() or None,
+            summary=summary.strip(),
+            threat_of_suit=bool(threat_of_suit),
+            time_bar_disclosure=bool(time_bar_disclosure),
+        )
+        target_id = collection_id.strip()
+
+        if action == "new":
+            new_id = add_collection(to_collection_payload(
+                letter, fallback_state=state.strip().upper(),
+            ))
+            add_communication(new_id, to_communication_payload(letter))
+            return RedirectResponse(url=f"/collections/{new_id}",
+                                    status_code=303)
+
+        if action == "attach":
+            if not target_id or not get_collection(target_id):
+                raise HTTPException(
+                    status_code=400,
+                    detail="pick an existing collection to attach to",
+                )
+            # Populate empty fields on the existing collection.
+            existing = get_collection(target_id)
+            update_collection(target_id, {
+                "collector_name": existing.collector_name or letter.collector_name,
+                "collector_address": existing.collector_address or letter.collector_address,
+                "original_creditor": existing.original_creditor or letter.original_creditor,
+                "alleged_amount": existing.alleged_amount or letter.alleged_amount,
+                "status": existing.status,
+                "first_contact_date": (
+                    existing.first_contact_date.isoformat()
+                    if existing.first_contact_date else letter.letter_date
+                ),
+                "last_activity_date": (
+                    existing.last_activity_date.isoformat()
+                    if existing.last_activity_date else None
+                ),
+                "state": existing.state or state.strip().upper(),
+                "account_mask": existing.account_mask,
+                "notes": existing.notes,
+            })
+            add_communication(target_id, to_communication_payload(letter))
+            return RedirectResponse(url=f"/collections/{target_id}",
+                                    status_code=303)
+
+        raise HTTPException(status_code=400, detail=f"unknown action {action!r}")
 
     return app
 
