@@ -1,0 +1,43 @@
+{% include "_letterhead.j2" %}
+
+Re: Demand for removal of obsolete information — 15 U.S.C. §1681c(a)
+{% if collection %}Collector / furnisher: {{ collection.collector_name }}
+Original creditor: {{ collection.original_creditor or "(unknown)" }}
+Alleged amount: ${{ "%.2f" % collection.alleged_amount }}
+{% if collection.account_mask %}Original account ending: {{ collection.account_mask }}
+{% endif %}{% endif %}
+
+To the Dispute Resolution Department:
+
+Under the Fair Credit Reporting Act, 15 U.S.C. §1681c(a), a consumer
+reporting agency may not report most adverse items more than seven (7)
+years from the date of the original delinquency that led to the
+action. The narrow exceptions in §1681c(a) and (b) do not apply to
+the above-referenced item.
+
+{% if collection and collection.last_activity_date %}The last activity on this account was {{ collection.last_activity_date }}. The seven-year window for adverse reporting closed approximately on
+{% if finding and finding.evidence.get('seven_year_expiry') %}{{ finding.evidence['seven_year_expiry'] }}{% else %}seven years from that date{% endif %}.
+{% endif %}
+
+I am demanding that you:
+
+  1. Delete this item from my consumer file in its entirety —
+     not simply mark it "obsolete" or "expired."
+  2. Notify each furnisher that contributed to this entry of the
+     deletion.
+  3. Send me written confirmation that the deletion has been
+     completed, identifying the date the entry was removed.
+
+If you contend that the seven-year period has not yet expired, you
+must provide me with the date of original delinquency you are using
+and an explanation of how that date complies with §1681c(c) (which
+fixes the date by reference to the events at §1681c(c)(1)).
+
+I expect a written response within the 30-day window of §1681i(a)(1).
+If the item remains on my file after that window, I reserve all
+remedies available under §1681n and §1681o.
+
+Sincerely,
+
+
+{{ profile.name }}

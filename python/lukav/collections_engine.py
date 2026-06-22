@@ -79,6 +79,16 @@ CREATE TABLE IF NOT EXISTS collection_letters (
 def init_collections(db_path: Optional[Path] = None) -> None:
     with _connect(db_path) as conn:
         conn.executescript(SCHEMA)
+        # Phase 6 migration: mini_miranda_present added after the initial
+        # ship. SQLite has no IF NOT EXISTS for ALTER; we test for it.
+        cols = {r["name"] for r in conn.execute(
+            "PRAGMA table_info(communications)"
+        ).fetchall()}
+        if "mini_miranda_present" not in cols:
+            conn.execute(
+                "ALTER TABLE communications "
+                "ADD COLUMN mini_miranda_present INTEGER NOT NULL DEFAULT -1"
+            )
 
 
 # ---- helpers ------------------------------------------------------------
@@ -233,14 +243,22 @@ def add_communication(coll_id: str, payload: dict,
     comm_id = _new_id("comm")
     occurred = payload.get("occurred_at")
     dt = _to_dt(occurred) or datetime.utcnow()
+    mini = payload.get("mini_miranda_present")
+    if mini is None or mini == "":
+        mini_val = -1
+    elif isinstance(mini, str):
+        mini_val = {"yes": 1, "no": 0, "unknown": -1}.get(mini.lower(), -1)
+    else:
+        mini_val = 1 if bool(mini) else 0
     with _connect(db_path) as conn:
         conn.execute(
             """
             INSERT INTO communications (
               communication_id, collection_account_id, kind, occurred_at,
               summary, threat_of_suit, third_party_disclosed,
-              profanity_or_abuse, called_at_workplace, after_cease_demand
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              profanity_or_abuse, called_at_workplace, after_cease_demand,
+              mini_miranda_present
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 comm_id, coll_id,
@@ -252,6 +270,7 @@ def add_communication(coll_id: str, payload: dict,
                 int(bool(payload.get("profanity_or_abuse"))),
                 int(bool(payload.get("called_at_workplace"))),
                 int(bool(payload.get("after_cease_demand"))),
+                mini_val,
             ),
         )
     return comm_id
@@ -278,6 +297,10 @@ def list_communications(coll_id: str,
             profanity_or_abuse=bool(r["profanity_or_abuse"]),
             called_at_workplace=bool(r["called_at_workplace"]),
             after_cease_demand=bool(r["after_cease_demand"]),
+            mini_miranda_present=(
+                r["mini_miranda_present"]
+                if "mini_miranda_present" in r.keys() else -1
+            ),
         )
         for r in rows
     ]
@@ -296,6 +319,8 @@ def audit_collection(coll_id: str,
         return []
     comms = list_communications(coll_id, db_path=db_path)
     rules = load_rules("fdcpa")
+    fcra = load_rules("fcra")
+    state_rules = load_rules("state")
     findings: list[Finding] = []
     findings.extend(_flag_validation_opportunity(coll, comms, rules))
     findings.extend(_flag_time_barred(coll, rules))
@@ -305,6 +330,11 @@ def audit_collection(coll_id: str,
     findings.extend(_flag_harassment(coll, comms, rules))
     findings.extend(_flag_threat_on_time_barred(coll, comms, rules))
     findings.extend(_flag_contact_after_cease(coll, comms, rules))
+    findings.extend(_flag_reg_f_seven_in_seven(coll, comms, rules))
+    findings.extend(_flag_reg_f_seven_after_conversation(coll, comms, rules))
+    findings.extend(_flag_mini_miranda_missing(coll, comms, rules))
+    findings.extend(_flag_obsolete_information(coll, fcra))
+    findings.extend(_flag_state_extension(coll, state_rules))
     return [f for f in findings if f.citation]
 
 
@@ -550,6 +580,190 @@ def _flag_threat_on_time_barred(
         )
 
 
+def _flag_reg_f_seven_in_seven(
+    coll: CollectionAccount, comms: list[Communication], rules: dict,
+) -> Iterable[Finding]:
+    rule = rules.get("fdcpa.reg_f_seven_in_seven_calls")
+    if not rule:
+        return
+    phones = sorted([c for c in comms if c.kind == "phone"],
+                    key=lambda c: c.occurred_at)
+    if len(phones) < 8:
+        return
+    # Rolling 7-day window: for each phone call, count how many phone
+    # calls land in the [c - 7d, c] interval. >7 anywhere = flag.
+    flagged_dates: set[date] = set()
+    for i, anchor in enumerate(phones):
+        window_start = anchor.occurred_at - timedelta(days=7)
+        in_window = [
+            c for c in phones
+            if window_start <= c.occurred_at <= anchor.occurred_at
+        ]
+        if len(in_window) > 7:
+            day = anchor.occurred_at.date()
+            if day in flagged_dates:
+                continue
+            flagged_dates.add(day)
+            yield Finding(
+                finding_id=_new(rule["rule_id"]),
+                account_id=coll.collection_id,
+                kind="violation",
+                severity=rule["severity"],
+                rule_id=rule["rule_id"],
+                title=rule["title"],
+                description=(
+                    f"{len(in_window)} phone calls in the 7-day window "
+                    f"ending {anchor.occurred_at}. Regulation F presumes "
+                    f"that more than 7 calls in 7 days violates §1692d."
+                ),
+                citation=rule["citation"],
+                evidence={
+                    "window_end": anchor.occurred_at.isoformat(),
+                    "calls_in_window": len(in_window),
+                    "communication_ids": [c.communication_id for c in in_window],
+                },
+                created_at=now_iso(),
+            )
+
+
+def _flag_reg_f_seven_after_conversation(
+    coll: CollectionAccount, comms: list[Communication], rules: dict,
+) -> Iterable[Finding]:
+    rule = rules.get("fdcpa.reg_f_seven_days_after_conversation")
+    if not rule:
+        return
+    phones = sorted([c for c in comms if c.kind == "phone"],
+                    key=lambda c: c.occurred_at)
+    # A "conversation" is a phone communication where the user noted the
+    # collector spoke with them — we use any phone entry whose summary is
+    # nonempty as a conservative proxy. (User can mark explicitly later.)
+    for i, conv in enumerate(phones):
+        if not conv.summary.strip():
+            continue
+        for nxt in phones[i + 1:]:
+            gap = nxt.occurred_at - conv.occurred_at
+            if gap <= timedelta(days=7) and gap > timedelta(0):
+                yield Finding(
+                    finding_id=_new(rule["rule_id"]),
+                    account_id=coll.collection_id,
+                    kind="violation",
+                    severity=rule["severity"],
+                    rule_id=rule["rule_id"],
+                    title=rule["title"],
+                    description=(
+                        f"Phone conversation on {conv.occurred_at} was "
+                        f"followed by another phone contact on "
+                        f"{nxt.occurred_at} — within the 7-day "
+                        f"post-conversation cool-down Regulation F imposes."
+                    ),
+                    citation=rule["citation"],
+                    evidence={
+                        "conversation_at": conv.occurred_at.isoformat(),
+                        "next_call_at": nxt.occurred_at.isoformat(),
+                        "communication_ids": [conv.communication_id, nxt.communication_id],
+                    },
+                    created_at=now_iso(),
+                )
+                break    # only flag the next call once per conversation
+
+
+def _flag_mini_miranda_missing(
+    coll: CollectionAccount, comms: list[Communication], rules: dict,
+) -> Iterable[Finding]:
+    rule = rules.get("fdcpa.mini_miranda_required")
+    if not rule:
+        return
+    written = sorted([c for c in comms if c.kind in ("letter", "email")],
+                     key=lambda c: c.occurred_at)
+    if not written:
+        return
+    first = written[0]
+    if first.mini_miranda_present == 0:
+        yield Finding(
+            finding_id=_new(rule["rule_id"]),
+            account_id=coll.collection_id,
+            kind="violation",
+            severity=rule["severity"],
+            rule_id=rule["rule_id"],
+            title=rule["title"],
+            description=(
+                f"The initial written communication on {first.occurred_at} "
+                f"did not contain the §1692e(11) Mini-Miranda disclosure "
+                f"that the sender is a debt collector attempting to "
+                f"collect a debt, and that any information will be used "
+                f"for that purpose."
+            ),
+            citation=rule["citation"],
+            evidence={
+                "communication_id": first.communication_id,
+                "occurred_at": first.occurred_at.isoformat(),
+            },
+            created_at=now_iso(),
+        )
+
+
+def _flag_obsolete_information(
+    coll: CollectionAccount, fcra: dict,
+) -> Iterable[Finding]:
+    rule = fcra.get("fcra.obsolete_information")
+    if not rule or not coll.last_activity_date:
+        return
+    seven_years = date(
+        coll.last_activity_date.year + 7,
+        coll.last_activity_date.month,
+        min(coll.last_activity_date.day, 28),
+    )
+    if date.today() < seven_years:
+        return
+    years_past = (date.today() - seven_years).days // 365
+    yield Finding(
+        finding_id=_new(rule["rule_id"]),
+        account_id=coll.collection_id,
+        kind="violation",
+        severity=rule["severity"],
+        rule_id=rule["rule_id"],
+        title=rule["title"],
+        description=(
+            f"Last activity {coll.last_activity_date}. Under §1681c(a) "
+            f"most adverse items must be removed from consumer reports "
+            f"seven years from the date of first delinquency — that "
+            f"window closed around {seven_years} ({years_past} years "
+            f"ago). The tradeline should be removable from all three "
+            f"bureaus."
+        ),
+        citation=rule["citation"],
+        evidence={
+            "last_activity_date": coll.last_activity_date.isoformat(),
+            "seven_year_expiry": seven_years.isoformat(),
+            "years_past_expiry": years_past,
+        },
+        created_at=now_iso(),
+    )
+
+
+def _flag_state_extension(
+    coll: CollectionAccount, state_rules: dict,
+) -> Iterable[Finding]:
+    state = (coll.state or "").upper()
+    if not state:
+        return
+    for rule in state_rules.values():
+        applies = rule.get("applies_to") or []
+        if state in applies:
+            yield Finding(
+                finding_id=_new(rule["rule_id"]),
+                account_id=coll.collection_id,
+                kind="violation",
+                severity=rule["severity"],
+                rule_id=rule["rule_id"],
+                title=rule["title"],
+                description=rule["description"],
+                citation=rule["citation"],
+                evidence={"state": state, "applies_to": applies},
+                created_at=now_iso(),
+            )
+
+
 def _flag_contact_after_cease(
     coll: CollectionAccount, comms: list[Communication], rules: dict,
 ) -> Iterable[Finding]:
@@ -667,6 +881,13 @@ COLLECTION_RULE_TO_TEMPLATE: dict[str, str] = {
     "fdcpa.workplace_communication":    "collection_workplace_cease.j2",
     "fdcpa.harassment":                 "collection_cease_contact.j2",
     "fdcpa.threat_on_time_barred":      "collection_cease_contact.j2",
+    "fdcpa.reg_f_seven_in_seven_calls":     "collection_cease_contact.j2",
+    "fdcpa.reg_f_seven_days_after_conversation": "collection_cease_contact.j2",
+    "fdcpa.mini_miranda_required":      "collection_validation.j2",
+    "fcra.obsolete_information":        "obsolete_info_removal.j2",
+    "state.rosenthal_act":              "collection_cease_contact.j2",
+    "state.nycdcr_reg":                 "collection_validation.j2",
+    "state.texas_finance_chapter_392":  "collection_validation.j2",
 }
 
 # Manually-pickable templates (the user can request any of these regardless
@@ -678,6 +899,7 @@ PICKABLE_TEMPLATES: list[tuple[str, str]] = [
     ("method_of_verification.j2",     "Method-of-verification follow-up (§1681i(a)(7))"),
     ("goodwill_letter.j2",            "Goodwill removal request (original creditor)"),
     ("collection_workplace_cease.j2", "Workplace-contact cease (§1692c(a)(3))"),
+    ("obsolete_info_removal.j2",      "Obsolete-info removal demand (§1681c(a))"),
 ]
 
 

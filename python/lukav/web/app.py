@@ -413,6 +413,7 @@ def create_app(plaid: Optional[PlaidLike] = None) -> FastAPI:
         profanity_or_abuse: str = Form(""),
         called_at_workplace: str = Form(""),
         after_cease_demand: str = Form(""),
+        mini_miranda_present: str = Form(""),
     ):
         if not get_collection(coll_id):
             raise HTTPException(status_code=404, detail="collection not found")
@@ -425,6 +426,7 @@ def create_app(plaid: Optional[PlaidLike] = None) -> FastAPI:
             "profanity_or_abuse": bool(profanity_or_abuse),
             "called_at_workplace": bool(called_at_workplace),
             "after_cease_demand": bool(after_cease_demand),
+            "mini_miranda_present": mini_miranda_present,
         })
         return RedirectResponse(url=f"/collections/{coll_id}", status_code=303)
 

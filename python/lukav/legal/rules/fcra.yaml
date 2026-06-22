@@ -22,3 +22,15 @@ rules:
       You may dispute inaccurate information directly with the furnisher
       that reported it. The furnisher must conduct a reasonable
       investigation and report the results.
+
+  - rule_id: fcra.obsolete_information
+    title: Negative item past the 7-year reporting limit
+    citation: 15 USC 1681c(a)
+    severity: high
+    description: >-
+      With limited exceptions (Chapter 7 bankruptcy at 10 years,
+      criminal convictions, qualifying credit/insurance/employment
+      transactions of $150k+), a consumer reporting agency may not
+      report adverse items more than 7 years from the date of the
+      original delinquency that led to the action. Both the CRA and the
+      furnisher can be told to remove an item past this period.

@@ -52,3 +52,6 @@ class Communication:
     profanity_or_abuse: bool = False
     called_at_workplace: bool = False
     after_cease_demand: bool = False
+    # -1 = unknown, 0 = not present, 1 = present. Drives the Mini-Miranda
+    # check (§1692e(11)) on the earliest written communication.
+    mini_miranda_present: int = -1
