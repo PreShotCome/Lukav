@@ -38,9 +38,34 @@ def main(argv: list[str] | None = None) -> int:
                              "installed.")
     parser.add_argument("--check", action="store_true",
                         help="Construct the app and exit (no server).")
+    parser.add_argument("--check-llm", action="store_true",
+                        help="Print which LLM backend Lukav would use, "
+                             "then exit. Useful when extraction quality "
+                             "looks wrong (e.g. you forgot LUKAV_LLM_BACKEND).")
     args = parser.parse_args(argv)
 
     from lukav.web.app import create_app
+
+    if args.check_llm:
+        import json as _json
+        from lukav.llm import describe_default_backend
+        info = describe_default_backend()
+        print(_json.dumps(info, indent=2))
+        if info.get("LLM_BACKEND_env_present_but_ignored"):
+            print(
+                "\nNote: a bare LLM_BACKEND env var is set in your shell "
+                "(likely from Theo). Lukav intentionally ignores it; set "
+                "LUKAV_LLM_BACKEND if you actually want a non-Claude "
+                "backend here."
+            )
+        if info.get("resolved", "").startswith("none"):
+            print(
+                "\nLukav will run WITHOUT an LLM. Audit, letters, and "
+                "the Plaid dashboard still work. Credit-report ingest "
+                "and Phase-5 letter ingest will require you to fill the "
+                "extracted fields manually."
+            )
+        return 0
 
     if args.check:
         app = create_app()
