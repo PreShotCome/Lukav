@@ -1,0 +1,33 @@
+{% include "_letterhead.j2" %}
+
+Re: Method-of-verification request under 15 U.S.C. §1681i(a)(7)
+Account: {{ collection.original_creditor or collection.collector_name }}
+{% if collection.account_mask %}Account ending: {{ collection.account_mask }}
+{% endif %}
+
+To the Dispute Resolution Department:
+
+I previously submitted a dispute under 15 U.S.C. §1681i regarding the
+above-referenced account. Your investigation concluded that the
+disputed information was "verified."
+
+Pursuant to 15 U.S.C. §1681i(a)(7), I am requesting a description of
+the procedure used to determine the accuracy and completeness of the
+information, including the business name, address, and telephone
+number (if reasonably available) of any furnisher of information
+contacted in connection with the reinvestigation.
+
+If your "verification" consisted of resending the data to the same
+furnisher and recording its response without independent review, the
+reinvestigation does not satisfy the "reasonable" standard the FCRA
+requires under §1681i(a)(1) and Cushman v. Trans Union Corp., 115
+F.3d 220 (3d Cir. 1997).
+
+I expect your written response within the 15-day window specified in
+§1681i(a)(7). If a substantive response is not provided, I reserve
+all remedies available under §1681n and §1681o.
+
+Sincerely,
+
+
+{{ profile.name }}

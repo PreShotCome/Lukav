@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <strong>Add a collection account</strong>
+  <p class="muted">All fields optional. Lukav will infer what it can; the more you fill in, the more it can flag.</p>
+  <form method="post" action="/collections">
+    <p><label>Collector name<br>
+      <input name="collector_name" size="50"></label></p>
+    <p><label>Collector address (mailing — for letters)<br>
+      <textarea name="collector_address" rows="3" cols="50"></textarea></label></p>
+    <p><label>Original creditor<br>
+      <input name="original_creditor" size="50"></label></p>
+    <p><label>Alleged amount $
+      <input name="alleged_amount" type="number" step="0.01" min="0"></label></p>
+    <p><label>Status
+      <select name="status">
+        <option value="in_collection">in_collection</option>
+        <option value="charged_off">charged_off</option>
+        <option value="sold">sold</option>
+        <option value="disputed">disputed</option>
+        <option value="settled">settled</option>
+        <option value="paid">paid</option>
+        <option value="removed">removed</option>
+      </select></label></p>
+    <p>
+      <label>First contact (YYYY-MM-DD)
+        <input name="first_contact_date" placeholder="2024-09-15"></label>
+      <label>Last activity (YYYY-MM-DD)
+        <input name="last_activity_date" placeholder="2020-01-01"></label>
+    </p>
+    <p>
+      <label>Your state <input name="state" maxlength="2"></label>
+      <label>Account ending <input name="account_mask" maxlength="6" size="6"></label>
+    </p>
+    <p><label>Notes (hardship context, anything for the goodwill letter)<br>
+      <textarea name="notes" rows="3" cols="50"></textarea></label></p>
+    <p><button type="submit">Save</button>
+       <a class="accent" href="/collections">cancel</a></p>
+  </form>
+</div>
+{% endblock %}

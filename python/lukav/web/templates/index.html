@@ -1,5 +1,13 @@
 {% extends "base.html" %}
 {% block content %}
+<div class="card">
+  <strong>Quick links</strong>
+  <p>
+    <a class="accent" href="/collections">→ Collections (manual debt + collector audit)</a><br>
+    <a class="accent" href="/letters">→ Letters history</a> ·
+    <a class="accent" href="/settings">→ Profile / settings</a>
+  </p>
+</div>
 {% if not cards %}
 <div class="card">
   <p class="ok">Lukav is running.</p>

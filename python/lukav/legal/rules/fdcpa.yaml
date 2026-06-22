@@ -32,3 +32,57 @@ rules:
       Consumers may demand a collector stop contacting them in writing.
       After receipt, the collector may only contact to confirm receipt or
       to notify of specific legal action.
+
+  - rule_id: fdcpa.communication_outside_hours
+    title: Communication outside permitted hours
+    citation: 15 USC 1692c(a)(1)
+    severity: high
+    description: >-
+      A debt collector may not communicate with a consumer at any unusual
+      time or place, presumed inconvenient outside 8:00 AM to 9:00 PM at
+      the consumer's location.
+
+  - rule_id: fdcpa.third_party_disclosure
+    title: Disclosure of debt to a third party
+    citation: 15 USC 1692c(b)
+    severity: high
+    description: >-
+      Except in limited circumstances, a debt collector may not
+      communicate about a consumer's debt with anyone other than the
+      consumer, their attorney, or a consumer reporting agency.
+
+  - rule_id: fdcpa.workplace_communication
+    title: Communication at the consumer's workplace
+    citation: 15 USC 1692c(a)(3)
+    severity: medium
+    description: >-
+      A debt collector may not contact a consumer at their place of
+      employment if the collector knows or has reason to know that the
+      employer prohibits such communication.
+
+  - rule_id: fdcpa.harassment
+    title: Harassment or abuse
+    citation: 15 USC 1692d
+    severity: high
+    description: >-
+      A debt collector may not engage in conduct the natural consequence
+      of which is to harass, oppress, or abuse — including profane
+      language and repeated calls intended to annoy.
+
+  - rule_id: fdcpa.threat_on_time_barred
+    title: Threat of action that cannot legally be taken
+    citation: 15 USC 1692e(5)
+    severity: high
+    description: >-
+      Threatening to take action (such as filing suit) that cannot
+      legally be taken — for example, suing on a time-barred debt — is
+      a false-representation violation.
+
+  - rule_id: fdcpa.contact_after_cease
+    title: Contact after a written cease demand
+    citation: 15 USC 1692c(c)
+    severity: high
+    description: >-
+      After receipt of a written cease-of-contact demand, the collector
+      may only communicate to confirm receipt or to notify of specific
+      action. Any other contact is a per-instance violation.

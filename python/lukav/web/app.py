@@ -20,6 +20,14 @@ from lukav.audit_engine import (
     get_finding, init_findings, list_findings, load_context, save_context,
     scan_account,
 )
+from lukav.collections_engine import (
+    COLLECTION_RULE_TO_TEMPLATE, PICKABLE_TEMPLATES, add_collection,
+    add_communication, audit_collection, delete_collection,
+    get_collection, get_collection_finding, get_collection_letter,
+    init_collections, list_collection_findings, list_collection_letters,
+    list_collections, list_communications, render_collection_letter,
+    save_collection_letter, scan_collection, update_collection,
+)
 from lukav.dispute_engine import (
     get_letter, get_profile, init_letters, list_letters, render_letter,
     save_letter, save_profile, template_for,
@@ -46,6 +54,7 @@ def create_app(plaid: Optional[PlaidLike] = None) -> FastAPI:
     db.init_db()
     init_findings()
     init_letters()
+    init_collections()
     plaid_client: PlaidLike = plaid or PlaidClient()
 
     # ---- core ---------------------------------------------------------
@@ -291,6 +300,188 @@ def create_app(plaid: Optional[PlaidLike] = None) -> FastAPI:
         return templates.TemplateResponse(
             request, "letter_saved.html",
             {"title": "Saved letter", "letter": letter},
+        )
+
+    # ---- collections (manual debt entries) -------------------------
+
+    @app.get("/collections", response_class=HTMLResponse)
+    def collections_index(request: Request):
+        return templates.TemplateResponse(
+            request, "collections.html",
+            {"title": "Collections", "collections": list_collections()},
+        )
+
+    @app.get("/collections/new", response_class=HTMLResponse)
+    def collections_new(request: Request):
+        return templates.TemplateResponse(
+            request, "collection_new.html",
+            {"title": "Add collection", "collection": None},
+        )
+
+    @app.post("/collections", response_class=RedirectResponse)
+    def collections_create(
+        collector_name: str = Form(""),
+        collector_address: str = Form(""),
+        original_creditor: str = Form(""),
+        alleged_amount: str = Form("0"),
+        status: str = Form("in_collection"),
+        first_contact_date: str = Form(""),
+        last_activity_date: str = Form(""),
+        state: str = Form(""),
+        account_mask: str = Form(""),
+        notes: str = Form(""),
+    ):
+        coll_id = add_collection({
+            "collector_name": collector_name.strip(),
+            "collector_address": collector_address.strip(),
+            "original_creditor": original_creditor.strip(),
+            "alleged_amount": alleged_amount or 0,
+            "status": status,
+            "first_contact_date": first_contact_date.strip() or None,
+            "last_activity_date": last_activity_date.strip() or None,
+            "state": state.strip().upper(),
+            "account_mask": account_mask.strip() or None,
+            "notes": notes.strip(),
+        })
+        return RedirectResponse(url=f"/collections/{coll_id}", status_code=303)
+
+    @app.get("/collections/{coll_id}", response_class=HTMLResponse)
+    def collections_detail(coll_id: str, request: Request):
+        coll = get_collection(coll_id)
+        if not coll:
+            raise HTTPException(status_code=404, detail="collection not found")
+        return templates.TemplateResponse(
+            request, "collection_detail.html",
+            {
+                "title": coll.collector_name or "Collection",
+                "collection": coll,
+                "communications": list_communications(coll_id),
+                "findings": list_collection_findings(coll_id),
+                "letters": list_collection_letters(coll_id),
+                "rule_to_template": COLLECTION_RULE_TO_TEMPLATE,
+                "pickable_templates": PICKABLE_TEMPLATES,
+            },
+        )
+
+    @app.post("/collections/{coll_id}", response_class=RedirectResponse)
+    def collections_update(
+        coll_id: str,
+        collector_name: str = Form(""),
+        collector_address: str = Form(""),
+        original_creditor: str = Form(""),
+        alleged_amount: str = Form("0"),
+        status: str = Form("in_collection"),
+        first_contact_date: str = Form(""),
+        last_activity_date: str = Form(""),
+        state: str = Form(""),
+        account_mask: str = Form(""),
+        notes: str = Form(""),
+    ):
+        if not get_collection(coll_id):
+            raise HTTPException(status_code=404, detail="collection not found")
+        update_collection(coll_id, {
+            "collector_name": collector_name.strip(),
+            "collector_address": collector_address.strip(),
+            "original_creditor": original_creditor.strip(),
+            "alleged_amount": alleged_amount or 0,
+            "status": status,
+            "first_contact_date": first_contact_date.strip() or None,
+            "last_activity_date": last_activity_date.strip() or None,
+            "state": state.strip().upper(),
+            "account_mask": account_mask.strip() or None,
+            "notes": notes.strip(),
+        })
+        return RedirectResponse(url=f"/collections/{coll_id}", status_code=303)
+
+    @app.post("/collections/{coll_id}/delete", response_class=RedirectResponse)
+    def collections_delete(coll_id: str):
+        delete_collection(coll_id)
+        return RedirectResponse(url="/collections", status_code=303)
+
+    @app.post("/collections/{coll_id}/communication", response_class=RedirectResponse)
+    def communications_create(
+        coll_id: str,
+        kind: str = Form("phone"),
+        occurred_at: str = Form(""),
+        summary: str = Form(""),
+        threat_of_suit: str = Form(""),
+        third_party_disclosed: str = Form(""),
+        profanity_or_abuse: str = Form(""),
+        called_at_workplace: str = Form(""),
+        after_cease_demand: str = Form(""),
+    ):
+        if not get_collection(coll_id):
+            raise HTTPException(status_code=404, detail="collection not found")
+        add_communication(coll_id, {
+            "kind": kind,
+            "occurred_at": occurred_at.strip() or None,
+            "summary": summary.strip(),
+            "threat_of_suit": bool(threat_of_suit),
+            "third_party_disclosed": bool(third_party_disclosed),
+            "profanity_or_abuse": bool(profanity_or_abuse),
+            "called_at_workplace": bool(called_at_workplace),
+            "after_cease_demand": bool(after_cease_demand),
+        })
+        return RedirectResponse(url=f"/collections/{coll_id}", status_code=303)
+
+    @app.post("/collections/{coll_id}/scan", response_class=RedirectResponse)
+    def collections_scan(coll_id: str):
+        if not get_collection(coll_id):
+            raise HTTPException(status_code=404, detail="collection not found")
+        scan_collection(coll_id)
+        return RedirectResponse(url=f"/collections/{coll_id}", status_code=303)
+
+    @app.get("/collections/{coll_id}/letter/{template_name}",
+             response_class=HTMLResponse)
+    def collection_letter_preview(coll_id: str, template_name: str,
+                                  request: Request,
+                                  finding_id: str = ""):
+        coll = get_collection(coll_id)
+        if not coll:
+            raise HTTPException(status_code=404, detail="collection not found")
+        body = render_collection_letter(coll_id, template_name,
+                                        finding_id or None)
+        if body is None:
+            raise HTTPException(status_code=400, detail="cannot render letter")
+        profile = get_profile()
+        return templates.TemplateResponse(
+            request, "collection_letter.html",
+            {
+                "title": template_name,
+                "collection": coll,
+                "template_name": template_name,
+                "body": body,
+                "finding_id": finding_id,
+                "profile_complete": bool(profile.get("name")),
+            },
+        )
+
+    @app.post("/collections/{coll_id}/letter/{template_name}/save",
+              response_class=RedirectResponse)
+    def collection_letter_save(coll_id: str, template_name: str,
+                               finding_id: str = Form("")):
+        body = render_collection_letter(coll_id, template_name,
+                                        finding_id or None)
+        if body is None:
+            raise HTTPException(status_code=400, detail="cannot render letter")
+        save_collection_letter(coll_id, finding_id or None,
+                               template_name, body)
+        return RedirectResponse(url=f"/collections/{coll_id}", status_code=303)
+
+    @app.get("/collections/{coll_id}/letter/{template_name}/text")
+    def collection_letter_text(coll_id: str, template_name: str,
+                               finding_id: str = ""):
+        body = render_collection_letter(coll_id, template_name,
+                                        finding_id or None)
+        if body is None:
+            raise HTTPException(status_code=404, detail="cannot render letter")
+        from fastapi.responses import PlainTextResponse
+        safe_name = template_name.replace(".j2", "")
+        return PlainTextResponse(
+            body, headers={
+                "Content-Disposition":
+                    f'attachment; filename="lukav-{safe_name}-{coll_id}.txt"',
+            },
         )
 
     return app

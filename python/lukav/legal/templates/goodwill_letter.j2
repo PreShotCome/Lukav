@@ -1,0 +1,35 @@
+{% include "_letterhead.j2" %}
+
+Re: Goodwill removal request
+Original creditor: {{ collection.original_creditor or collection.collector_name }}
+{% if collection.account_mask %}Account ending: {{ collection.account_mask }}
+{% endif %}
+
+To whom it may concern,
+
+I am writing to ask for your consideration of a goodwill adjustment
+to the reporting of the above-referenced account.
+
+I am not disputing the accuracy of the information; I am asking you,
+as a matter of customer goodwill, to remove or update the negative
+notations associated with this account on my consumer credit file
+with each consumer reporting agency to which you furnish data.
+
+Context I'd like you to consider:
+
+  - {{ collection.notes or "(brief explanation: hardship, one-time slip, life event)" }}
+  - I have since [describe corrective action — paid in full, set up
+    autopay, closed the account, etc.].
+  - I have otherwise maintained a positive payment history.
+
+Removing or updating this notation will materially improve my ability
+to obtain credit, housing, and employment, and the alleged amount has
+been resolved. I would be grateful for any goodwill consideration you
+can offer.
+
+Thank you for taking the time to read this letter.
+
+Sincerely,
+
+
+{{ profile.name }}

@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <strong>{{ collection.collector_name or "(no collector name)" }}</strong>
+  <span class="muted">[{{ collection.status }}]</span>
+  <p class="muted">
+    Original creditor: {{ collection.original_creditor or "(unknown)" }}
+    · Alleged ${{ "%.2f" % collection.alleged_amount }}
+    {% if collection.state %}· State: {{ collection.state }}{% endif %}
+  </p>
+  <p class="muted">
+    First contact: {{ collection.first_contact_date or "—" }}
+    · Last activity: {{ collection.last_activity_date or "—" }}
+    {% if collection.account_mask %}· Mask {{ collection.account_mask }}{% endif %}
+  </p>
+  <p>
+    <a class="accent" href="/collections">&larr; back</a> ·
+    <form method="post" action="/collections/{{ collection.collection_id }}/scan" style="display:inline">
+      <button type="submit">Run scan</button>
+    </form>
+  </p>
+</div>
+
+<div class="card">
+  <strong>Pickable letter templates</strong>
+  <p class="muted">Generate any template against this collection account.</p>
+  <ul>
+  {% for tmpl, label in pickable_templates %}
+    <li><a class="accent"
+       href="/collections/{{ collection.collection_id }}/letter/{{ tmpl }}">
+       {{ label }}
+    </a></li>
+  {% endfor %}
+  </ul>
+</div>
+
+<div class="card">
+  <strong>Communications log</strong>
+  <p class="muted">Each row powers the FDCPA pattern checks. Date format: <code>YYYY-MM-DDTHH:MM</code></p>
+  <form method="post" action="/collections/{{ collection.collection_id }}/communication">
+    <p>
+      <label>Kind
+        <select name="kind">
+          <option value="phone">phone</option>
+          <option value="letter">letter</option>
+          <option value="email">email</option>
+          <option value="text">text</option>
+          <option value="in_person">in_person</option>
+        </select></label>
+      <label>When
+        <input name="occurred_at" type="datetime-local"></label>
+    </p>
+    <p><label>What happened<br>
+      <textarea name="summary" rows="2" cols="60"></textarea></label></p>
+    <p>
+      <label><input type="checkbox" name="threat_of_suit" value="1"> threatened suit</label>
+      <label><input type="checkbox" name="third_party_disclosed" value="1"> discussed with a third party</label>
+      <label><input type="checkbox" name="profanity_or_abuse" value="1"> profanity / abuse</label>
+    </p>
+    <p>
+      <label><input type="checkbox" name="called_at_workplace" value="1"> called at workplace</label>
+      <label><input type="checkbox" name="after_cease_demand" value="1"> after I sent cease demand</label>
+    </p>
+    <p><button type="submit">Add communication</button></p>
+  </form>
+  {% if communications %}
+  <hr style="border-color:var(--surface)">
+  {% for c in communications %}
+  <div style="margin-bottom:0.75rem">
+    <span class="muted">{{ c.occurred_at }}</span>
+    <strong>{{ c.kind }}</strong>
+    {% if c.threat_of_suit %}<span class="bad">threat-of-suit</span>{% endif %}
+    {% if c.third_party_disclosed %}<span class="bad">third-party</span>{% endif %}
+    {% if c.profanity_or_abuse %}<span class="bad">abusive</span>{% endif %}
+    {% if c.called_at_workplace %}<span class="accent">workplace</span>{% endif %}
+    {% if c.after_cease_demand %}<span class="bad">after-cease</span>{% endif %}
+    <div class="muted">{{ c.summary }}</div>
+  </div>
+  {% endfor %}
+  {% endif %}
+</div>
+
+<div class="card">
+  <strong>Findings ({{ findings|length }})</strong>
+  {% if not findings %}
+  <p class="muted">Run a scan to populate.</p>
+  {% endif %}
+</div>
+{% for f in findings %}
+<div class="card">
+  <div>
+    <strong>{{ f.title }}</strong>
+    <span class="{% if f.severity == 'high' %}bad{% elif f.severity == 'medium' %}accent{% else %}muted{% endif %}">
+      [{{ f.severity }}]
+    </span>
+  </div>
+  <p>{{ f.description }}</p>
+  <p class="muted"><strong>Citation:</strong> {{ f.citation }} · <code>{{ f.rule_id }}</code></p>
+  {% if f.rule_id in rule_to_template %}
+    {% set tmpl = rule_to_template[f.rule_id] %}
+    <p>
+      <a class="accent"
+         href="/collections/{{ collection.collection_id }}/letter/{{ tmpl }}?finding_id={{ f.finding_id }}">
+         Draft {{ tmpl.replace('.j2', '') }} letter &rarr;
+      </a>
+    </p>
+  {% endif %}
+</div>
+{% endfor %}
+
+{% if letters %}
+<div class="card">
+  <strong>Saved letters for this account</strong>
+  <ul>
+  {% for l in letters %}
+    <li>
+      <span class="muted">{{ l.created_at }}</span> ·
+      <code>{{ l.template }}</code>
+    </li>
+  {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<div class="card">
+  <form method="post" action="/collections/{{ collection.collection_id }}/delete"
+        onsubmit="return confirm('Delete this collection and its log?')">
+    <button type="submit" class="bad">Delete this collection</button>
+  </form>
+</div>
+{% endblock %}
