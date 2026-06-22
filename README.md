@@ -26,11 +26,39 @@ python/lukav/
 
 ## Quickstart
 
+### Desktop install (recommended)
+
+**Windows** — once you've cloned the repo:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\scripts\install.ps1
+```
+
+Creates a venv, installs Lukav with `[plaid,secrets,desktop]`, and
+drops a **Lukav** shortcut on your Desktop. Double-click to launch
+into a native window.
+
+**macOS / Linux**:
+
+```bash
+chmod +x scripts/install.sh && ./scripts/install.sh
+```
+
+macOS installs `/Applications/Lukav.app`. Linux writes
+`~/.local/share/applications/Lukav.desktop`.
+
+### Manual / dev install
+
 ```bash
 python -m venv .venv
 source .venv/bin/activate         # or .venv\Scripts\activate on Windows
-pip install -e ".[dev,plaid,secrets]"
-python -m lukav                   # opens http://127.0.0.1:8765
+pip install -e ".[dev,plaid,secrets,desktop]"
+
+python -m lukav                   # browser tab at http://127.0.0.1:8765
+python -m lukav --window          # native pywebview window
+python -m lukav --no-open         # server only, no browser
+python -m lukav --check           # smoke check, exits
 ```
 
 ## End-to-end check
