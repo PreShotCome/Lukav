@@ -57,7 +57,7 @@
         <input name="state" maxlength="2" size="3" value="{{ collection.state or '' }}"></label>
       <label>Status
         <select name="status">
-          {% for s in ["in_collection","charged_off","sold","disputed","settled","paid","removed"] %}
+          {% for s in ["in_collection","charged_off","sold","disputed","open_with_lates","closed_with_lates","settled","paid","removed"] %}
           <option value="{{ s }}" {% if collection.status == s %}selected{% endif %}>{{ s }}</option>
           {% endfor %}
         </select></label>

@@ -25,24 +25,37 @@ from lukav.llm import ChatMessage, build_default_client
 
 SYSTEM_PROMPT = (
     "You are a strict JSON extractor. You will be given a CHUNK of "
-    "text from a consumer credit report. Extract every negative "
-    "tradeline that APPEARS IN THIS CHUNK: collection accounts, "
-    "charge-offs, accounts in dispute, accounts sold to debt buyers, "
-    "accounts past due, and accounts flagged for repossession or "
-    "bankruptcy. SKIP accounts shown as current / never late / paid "
-    "in full / closed in good standing.\n\n"
+    "text from a consumer credit report. Extract EVERY tradeline that "
+    "appears in this chunk, including:\n"
+    "  - active collections, charge-offs, accounts in dispute, accounts "
+    "sold to debt buyers\n"
+    "  - any account with a late payment in its history (30 / 60 / 90 / "
+    "120 / 150 / 180-day late), even if it's currently \"open\" or "
+    "\"paid\"\n"
+    "  - closed accounts with any negative history\n"
+    "  - bankruptcies, repossessions, foreclosures, deficiencies, liens, "
+    "judgments\n\n"
+    "Only SKIP an account when it is shown as both (a) currently open AND "
+    "(b) never-late / pays-as-agreed with NO late marks at all in its "
+    "payment history. When in doubt, INCLUDE it — the user can untick.\n\n"
     "HARD RULES — read carefully:\n"
     "  - Use ONLY values that appear verbatim in the input. If a field "
     "is not present in the text, use empty string / 0 / null.\n"
     "  - Do NOT infer amounts from balance ranges. Do NOT guess dates. "
     "Do NOT invent collector or creditor names from common-sounding "
-    "ones. If you are unsure, return empty.\n"
+    "ones.\n"
     "  - For DATE fields: parse them in any format the credit bureau "
     "uses (MM/DD/YYYY, YYYY-MM-DD, 'Jun 2018', 'June 15, 2018', etc.) "
     "and emit them as ISO YYYY-MM-DD. If only month+year is shown, "
     "use the FIRST of the month. If you cannot find the field in this "
     "chunk, set it to null — a regex pass will try to fill it later.\n"
-    "  - If this chunk contains NO negative tradelines, return [].\n\n"
+    "  - Set status to the most fitting value: in_collection | "
+    "charged_off | sold | disputed | settled | paid | removed. If the "
+    "tradeline is currently open with late history, use \"in_collection\" "
+    "only when actually in collections; otherwise use the bureau's "
+    "status if it fits — otherwise \"disputed\". Status \"paid\" means "
+    "paid in full; we still extract these when they had lates.\n"
+    "  - If this chunk contains NO tradelines, return [].\n\n"
     "Respond with one compact JSON array — no prose before or after, "
     "no markdown fences. Each element MUST match this shape:\n\n"
     "[\n"
@@ -297,7 +310,8 @@ def _coerce_tradeline(d: dict) -> Tradeline:
         amount = 0.0
     status = (d.get("status") or "in_collection").lower().strip()
     if status not in {"in_collection", "charged_off", "sold", "disputed",
-                      "settled", "paid", "removed"}:
+                      "settled", "paid", "removed", "open_with_lates",
+                      "closed_with_lates"}:
         status = "in_collection"
     return Tradeline(
         collector_name=str(d.get("collector_name") or "").strip(),
@@ -384,9 +398,14 @@ def extract_credit_report(text: str, *,
                 out.ungrounded_dropped += 1
                 continue
             _regex_fill_dates(tradeline, text)
+            # Dedup key includes original_creditor + rounded amount so
+            # the same collector with multiple different debts doesn't
+            # collapse to one row when account masks are missing.
             key = (
                 tradeline.collector_name.lower().strip(),
-                tradeline.account_mask or "",
+                (tradeline.account_mask or "").strip(),
+                tradeline.original_creditor.lower().strip(),
+                round(tradeline.alleged_amount, 0),
             )
             if key in seen_keys:
                 out.duplicates_dropped += 1
