@@ -340,7 +340,8 @@ def audit_collection(coll_id: str,
     return [f for f in findings if f.citation]
 
 
-_NEGATIVE_STATUSES = {"in_collection", "charged_off", "sold", "disputed"}
+_NEGATIVE_STATUSES = {"in_collection", "charged_off", "sold", "disputed",
+                      "open_with_lates", "closed_with_lates"}
 
 
 def _flag_fcra_bureau_dispute(

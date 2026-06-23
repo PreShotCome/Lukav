@@ -82,7 +82,7 @@
       <input name="account_mask_{{ loop.index0 }}" size="6" value="{{ t.account_mask or '' }}"></label>
     <label>Status
       <select name="status_{{ loop.index0 }}">
-        {% for s in ["in_collection","charged_off","sold","disputed","settled","paid","removed"] %}
+        {% for s in ["in_collection","charged_off","sold","disputed","open_with_lates","closed_with_lates","settled","paid","removed"] %}
         <option value="{{ s }}" {% if t.status == s %}selected{% endif %}>{{ s }}</option>
         {% endfor %}
       </select></label>

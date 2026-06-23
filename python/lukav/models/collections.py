@@ -12,13 +12,15 @@ from datetime import date, datetime
 from typing import Literal, Optional
 
 CollectionStatus = Literal[
-    "in_collection",   # actively being collected
-    "charged_off",     # creditor charged off, may or may not be with a collector
-    "sold",            # sold to a debt buyer
-    "disputed",        # validation/dispute in flight
-    "settled",         # settled for less
-    "paid",            # paid in full
-    "removed",         # removed from credit report
+    "in_collection",       # actively being collected
+    "charged_off",         # creditor charged off, may or may not be with a collector
+    "sold",                # sold to a debt buyer
+    "disputed",            # validation/dispute in flight
+    "settled",             # settled for less
+    "paid",                # paid in full
+    "removed",             # removed from credit report
+    "open_with_lates",     # currently open, has late history (credit-repair target)
+    "closed_with_lates",   # closed, has late history
 ]
 
 
