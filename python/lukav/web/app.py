@@ -22,11 +22,12 @@ from lukav.audit_engine import (
 )
 from lukav.collections_engine import (
     COLLECTION_RULE_TO_TEMPLATE, PICKABLE_TEMPLATES, add_collection,
-    add_communication, audit_collection, delete_collection,
-    get_collection, get_collection_finding, get_collection_letter,
-    init_collections, list_collection_findings, list_collection_letters,
-    list_collections, list_communications, render_collection_letter,
-    save_collection_letter, scan_collection, update_collection,
+    add_communication, audit_collection, audit_diagnostics,
+    delete_collection, get_collection, get_collection_finding,
+    get_collection_letter, init_collections, list_collection_findings,
+    list_collection_letters, list_collections, list_communications,
+    render_collection_letter, save_collection_letter, scan_collection,
+    update_collection,
 )
 from lukav.dispute_engine import (
     get_letter, get_profile, init_letters, list_letters, render_letter,
@@ -371,6 +372,7 @@ def create_app(plaid: Optional[PlaidLike] = None) -> FastAPI:
                 "rule_to_template": COLLECTION_RULE_TO_TEMPLATE,
                 "pickable_templates": PICKABLE_TEMPLATES,
                 "buyer": debt_buyers.match(coll.collector_name or ""),
+                "diagnostic": audit_diagnostics(coll_id),
             },
         )
 
