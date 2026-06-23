@@ -105,7 +105,7 @@ def test_extract_drops_hallucinated_collectors():
     names = {t.collector_name for t in result.tradelines}
     assert "Midland Credit Management" in names
     assert "Definitely Not Real Recovery LLC" not in names
-    assert "ungrounded" in (result.error or "")
+    assert result.ungrounded_dropped >= 1
 
 
 def test_extract_credit_report_handles_garbage_json():
