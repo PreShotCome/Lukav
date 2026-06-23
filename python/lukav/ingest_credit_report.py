@@ -37,6 +37,11 @@ SYSTEM_PROMPT = (
     "  - Do NOT infer amounts from balance ranges. Do NOT guess dates. "
     "Do NOT invent collector or creditor names from common-sounding "
     "ones. If you are unsure, return empty.\n"
+    "  - For DATE fields: parse them in any format the credit bureau "
+    "uses (MM/DD/YYYY, YYYY-MM-DD, 'Jun 2018', 'June 15, 2018', etc.) "
+    "and emit them as ISO YYYY-MM-DD. If only month+year is shown, "
+    "use the FIRST of the month. If you cannot find the field in this "
+    "chunk, set it to null — a regex pass will try to fill it later.\n"
     "  - If this chunk contains NO negative tradelines, return [].\n\n"
     "Respond with one compact JSON array — no prose before or after, "
     "no markdown fences. Each element MUST match this shape:\n\n"
@@ -57,8 +62,12 @@ SYSTEM_PROMPT = (
 )
 
 
-CHUNK_SIZE = 6000           # chars per LLM call
-CHUNK_OVERLAP = 400         # carry tail into next chunk to catch table-boundary tradelines
+CHUNK_SIZE = 12000          # larger so a single tradeline stays whole
+CHUNK_OVERLAP = 1500        # generous overlap so boundary tradelines hit twice
+TRADELINE_HEAD_RE = re.compile(
+    r"^[ \t]*(?:[A-Z][A-Z0-9 ,&./'\-]{4,60})\s*$",
+    re.MULTILINE,
+)
 
 # Words that mark a chunk as worth sending to the LLM. Credit reports are
 # dominated by good-standing accounts, personal info, inquiries, and
@@ -80,8 +89,11 @@ NEGATIVE_KEYWORDS = (
 
 
 def _chunk_text(text: str) -> list[str]:
-    """Split the report into overlapping ~6k-char chunks. Prefers
-    breaking at blank lines so a single tradeline doesn't get split."""
+    """Split the report into overlapping ~12k-char chunks. Prefers
+    breaking at a tradeline-header line (a line of mostly capital
+    letters that looks like a creditor name), then at blank lines, then
+    hard-cuts. Larger chunks + bigger overlap mean a single tradeline
+    almost never gets split across two LLM calls."""
     text = text.strip()
     if len(text) <= CHUNK_SIZE:
         return [text]
@@ -90,12 +102,16 @@ def _chunk_text(text: str) -> list[str]:
     while i < len(text):
         end = min(i + CHUNK_SIZE, len(text))
         if end < len(text):
-            # Back up to the last blank-line break if there's one within
-            # the trailing 800 chars; otherwise hard-cut.
-            window = text[end - 800:end]
-            break_at = window.rfind("\n\n")
-            if break_at >= 0:
-                end = end - 800 + break_at
+            window = text[end - 2000:end]
+            # Prefer tradeline header (a creditor-name line) within the
+            # trailing 2k chars.
+            head_matches = list(TRADELINE_HEAD_RE.finditer(window))
+            if head_matches:
+                end = end - 2000 + head_matches[-1].start()
+            else:
+                break_at = window.rfind("\n\n")
+                if break_at >= 0:
+                    end = end - 2000 + break_at
         chunks.append(text[i:end])
         if end >= len(text):
             break
@@ -109,6 +125,104 @@ def _chunk_is_relevant(chunk: str) -> bool:
     typically 2-4 LLM calls."""
     lower = chunk.lower()
     return any(kw in lower for kw in NEGATIVE_KEYWORDS)
+
+
+# ---- regex field pre-extraction ----------------------------------------
+
+# Date patterns we'll accept verbatim from credit reports. Bureaus print
+# dates in a half-dozen common forms — keep them all.
+_DATE_RE = (
+    r"(\d{1,2}/\d{1,2}/\d{2,4}"
+    r"|\d{4}-\d{2}-\d{2}"
+    r"|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},?\s+\d{4}"
+    r"|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{4}"
+    r")"
+)
+
+# Labels for each field, as seen in Experian / Equifax / TransUnion.
+_LABEL_PATTERNS: dict[str, list[re.Pattern]] = {
+    "date_opened": [
+        re.compile(rf"Date\s+Opened[:\s]+{_DATE_RE}", re.IGNORECASE),
+        re.compile(rf"Opened[:\s]+{_DATE_RE}", re.IGNORECASE),
+        re.compile(rf"Account\s+Opened[:\s]+{_DATE_RE}", re.IGNORECASE),
+    ],
+    "date_of_first_delinquency": [
+        re.compile(rf"Date\s+of\s+First\s+Delinquency[:\s]+{_DATE_RE}", re.IGNORECASE),
+        re.compile(rf"First\s+Delinquency[:\s]+{_DATE_RE}", re.IGNORECASE),
+        re.compile(rf"\bDOFD[:\s]+{_DATE_RE}", re.IGNORECASE),
+    ],
+    "last_activity_date": [
+        re.compile(rf"Last\s+Activity[:\s]+{_DATE_RE}", re.IGNORECASE),
+        re.compile(rf"Date\s+of\s+Last\s+Activity[:\s]+{_DATE_RE}", re.IGNORECASE),
+        re.compile(rf"Date\s+of\s+Last\s+Payment[:\s]+{_DATE_RE}", re.IGNORECASE),
+        re.compile(rf"Last\s+Payment[:\s]+{_DATE_RE}", re.IGNORECASE),
+        re.compile(rf"Last\s+Reported[:\s]+{_DATE_RE}", re.IGNORECASE),
+        re.compile(rf"Date\s+Reported[:\s]+{_DATE_RE}", re.IGNORECASE),
+    ],
+}
+
+
+def _normalize_date(raw: str) -> Optional[str]:
+    """Coerce a date string from any of the bureau formats into
+    YYYY-MM-DD, or None if it can't be parsed."""
+    if not raw:
+        return None
+    raw = raw.strip().strip(",")
+    fmts = (
+        "%Y-%m-%d",
+        "%m/%d/%Y", "%m/%d/%y",
+        "%b %d, %Y", "%b %d %Y", "%B %d, %Y", "%B %d %Y",
+        "%b %Y", "%B %Y",
+    )
+    from datetime import datetime
+    for fmt in fmts:
+        try:
+            return datetime.strptime(raw, fmt).date().isoformat()
+        except ValueError:
+            continue
+    return None
+
+
+def _find_block_for_collector(text: str, collector_name: str,
+                              window_chars: int = 2500) -> str:
+    """Return the chunk of source text starting at the collector name —
+    used to scope a regex search to one tradeline. We only look FORWARD
+    (with a small 60-char back-buffer for line context), because credit
+    reports lay out fields below the creditor name; looking back would
+    bleed into the previous tradeline's date fields."""
+    if not collector_name:
+        return ""
+    tokens = [t for t in re.split(r"\W+", collector_name) if len(t) >= 4]
+    if not tokens:
+        return ""
+    lower = text.lower()
+    needle = tokens[0].lower()
+    idx = lower.find(needle)
+    if idx < 0:
+        return ""
+    start = max(0, idx - 60)
+    end = min(len(text), idx + window_chars)
+    return text[start:end]
+
+
+def _regex_fill_dates(tradeline: "Tradeline", text: str) -> "Tradeline":
+    """For any date field the LLM left blank, search the surrounding
+    source block by label pattern. Updates `tradeline` in place."""
+    block = _find_block_for_collector(text, tradeline.collector_name)
+    if not block:
+        return tradeline
+    for field in ("date_opened", "date_of_first_delinquency",
+                  "last_activity_date"):
+        if getattr(tradeline, field):
+            continue
+        for pat in _LABEL_PATTERNS[field]:
+            m = pat.search(block)
+            if m:
+                normalized = _normalize_date(m.group(1))
+                if normalized:
+                    setattr(tradeline, field, normalized)
+                    break
+    return tradeline
 
 
 @dataclass
@@ -265,6 +379,8 @@ def extract_credit_report(text: str, *,
             if not _is_grounded(tradeline, text, raw_lower):
                 ungrounded_dropped += 1
                 continue
+            # Regex fallback for any date the LLM didn't fill.
+            _regex_fill_dates(tradeline, text)
             key = (
                 tradeline.collector_name.lower().strip(),
                 tradeline.account_mask or "",
@@ -273,6 +389,11 @@ def extract_credit_report(text: str, *,
                 continue
             seen_keys.add(key)
             out.tradelines.append(tradeline)
+
+    # One more sweep: for tradelines that still have empty dates, look
+    # across the WHOLE report (not just the chunk).
+    for t in out.tradelines:
+        _regex_fill_dates(t, text)
 
     if errors:
         out.error = " | ".join(errors[:3])
