@@ -335,7 +335,109 @@ def audit_collection(coll_id: str,
     findings.extend(_flag_mini_miranda_missing(coll, comms, rules))
     findings.extend(_flag_obsolete_information(coll, fcra))
     findings.extend(_flag_state_extension(coll, state_rules))
+    findings.extend(_flag_fcra_bureau_dispute(coll, fcra))
+    findings.extend(_flag_fcra_direct_furnisher_dispute(coll, fcra))
     return [f for f in findings if f.citation]
+
+
+_NEGATIVE_STATUSES = {"in_collection", "charged_off", "sold", "disputed"}
+
+
+def _flag_fcra_bureau_dispute(
+    coll: CollectionAccount, fcra: dict,
+) -> Iterable[Finding]:
+    """Any negative tradeline reported to a CRA carries a §1681i dispute
+    right. We fire this unconditionally for in_collection / charged_off /
+    sold / disputed accounts so the user always sees the option."""
+    if coll.status not in _NEGATIVE_STATUSES:
+        return
+    rule = fcra.get("fcra.bureau_dispute_opportunity")
+    if not rule:
+        return
+    yield Finding(
+        finding_id=_new(rule["rule_id"]),
+        account_id=coll.collection_id,
+        kind="violation",
+        severity=rule["severity"],
+        rule_id=rule["rule_id"],
+        title=rule["title"],
+        description=(
+            f"This account is reported as {coll.status}. You may file a "
+            f"§1681i dispute with each consumer reporting agency where it "
+            f"appears. The CRA must investigate within 30 days. Use the "
+            f"FCRA dispute letter."
+        ),
+        citation=rule["citation"],
+        evidence={"status": coll.status},
+        created_at=now_iso(),
+    )
+
+
+def _flag_fcra_direct_furnisher_dispute(
+    coll: CollectionAccount, fcra: dict,
+) -> Iterable[Finding]:
+    """§1681s-2(a)(8) direct dispute with the furnisher — same logic."""
+    if coll.status not in _NEGATIVE_STATUSES:
+        return
+    rule = fcra.get("fcra.direct_furnisher_dispute")
+    if not rule:
+        return
+    yield Finding(
+        finding_id=_new(rule["rule_id"]),
+        account_id=coll.collection_id,
+        kind="violation",
+        severity=rule["severity"],
+        rule_id=rule["rule_id"],
+        title=rule["title"],
+        description=(
+            f"Status is {coll.status}. You may dispute inaccurate "
+            f"information directly with {coll.collector_name or 'the furnisher'} "
+            f"under §1681s-2(a)(8). The furnisher must conduct a "
+            f"reasonable investigation."
+        ),
+        citation=rule["citation"],
+        evidence={"status": coll.status,
+                  "furnisher": coll.collector_name or ""},
+        created_at=now_iso(),
+    )
+
+
+def audit_diagnostics(coll_id: str,
+                      *, db_path: Optional[Path] = None) -> dict:
+    """Return a per-account diagnostic explaining which rule categories
+    fired and which were skipped for lack of data. Powers the
+    "0 findings — here's why" panel."""
+    coll = get_collection(coll_id, db_path=db_path)
+    if not coll:
+        return {}
+    comms = list_communications(coll_id, db_path=db_path)
+    notes: list[str] = []
+    if not coll.state:
+        notes.append(
+            "State of residence is empty: time-barred SOL, Rosenthal (CA), "
+            "and other state-law rules are skipped. Set it in the edit "
+            "form above."
+        )
+    if not coll.last_activity_date:
+        notes.append(
+            "Last activity date is empty: time-barred SOL and the §1681c "
+            "obsolete-info check (7-year reporting limit) are skipped."
+        )
+    if not coll.first_contact_date and coll.status in _NEGATIVE_STATUSES:
+        notes.append(
+            "First-contact date is empty: the §1692g 30-day validation "
+            "window math is skipped. If you ever received written "
+            "communication from the collector, fill this in."
+        )
+    if not comms:
+        notes.append(
+            "Communications log is empty: every FDCPA conduct rule "
+            "(outside-hours calls, third-party disclosure, harassment, "
+            "Reg F 7-in-7, mini-Miranda, contact after cease, threats on "
+            "time-barred debt) needs at least one logged interaction "
+            "before it can fire."
+        )
+    return {"notes": notes}
 
 
 def _flag_validation_opportunity(
@@ -885,6 +987,8 @@ COLLECTION_RULE_TO_TEMPLATE: dict[str, str] = {
     "fdcpa.reg_f_seven_days_after_conversation": "collection_cease_contact.j2",
     "fdcpa.mini_miranda_required":      "collection_validation.j2",
     "fcra.obsolete_information":        "obsolete_info_removal.j2",
+    "fcra.bureau_dispute_opportunity":  "fcra_dispute.j2",
+    "fcra.direct_furnisher_dispute":    "direct_dispute.j2",
     "state.rosenthal_act":              "collection_cease_contact.j2",
     "state.nycdcr_reg":                 "collection_validation.j2",
     "state.texas_finance_chapter_392":  "collection_validation.j2",
