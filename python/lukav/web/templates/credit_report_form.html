@@ -13,16 +13,36 @@
     (Equifax, Experian, TransUnion) — duplicates across bureaus are
     useful: each tradeline can be disputed at every bureau it appears.
   </p>
+  <p class="muted">
+    <strong>Heads up</strong>: extraction takes <em>a few minutes</em>.
+    Lukav splits the report into chunks and asks Claude about each
+    one — for a 48-page report that's typically 2–5 LLM calls of
+    30–60 seconds each. The page will look idle until it's done. Do
+    not refresh; let it finish.
+  </p>
 </div>
 
 <div class="card">
-  <form method="post" action="/credit-report" enctype="multipart/form-data">
+  <form method="post" action="/credit-report" enctype="multipart/form-data"
+        onsubmit="document.getElementById('working').style.display='block';
+                 document.getElementById('go').disabled=true;
+                 document.getElementById('go').textContent='Extracting...';">
     <p><label>Credit-report PDF
       <input type="file" name="file" accept=".pdf" required></label></p>
     <p><label>Your state (used for SOL checks)
       <input name="state" maxlength="2"></label></p>
-    <p><button type="submit">Extract tradelines</button>
-       <a class="accent" href="/collections">cancel</a></p>
+    <p>
+      <button id="go" type="submit">Extract tradelines</button>
+      <a class="accent" href="/collections">cancel</a>
+    </p>
+    <div id="working" class="card" style="display:none; margin-top:1rem">
+      <p class="accent"><strong>Working…</strong></p>
+      <p class="muted">
+        Reading the PDF, chunking, and calling Claude. This commonly
+        takes 1–5 minutes. The next page will load on its own — keep
+        this tab open.
+      </p>
+    </div>
   </form>
 </div>
 {% endblock %}
