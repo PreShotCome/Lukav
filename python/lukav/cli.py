@@ -48,8 +48,22 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.check_llm:
         import json as _json
-        from lukav.llm import describe_default_backend
+        from lukav.llm import build_default_client, describe_default_backend, ChatMessage
         info = describe_default_backend()
+        # Try a tiny ping so auth/network failures surface here, not
+        # 15 minutes into a credit-report ingest.
+        try:
+            client = build_default_client()
+            if client is None:
+                info["ping"] = "skipped (no client)"
+            else:
+                resp = client.chat(
+                    messages=[ChatMessage(role="user", content="reply OK")],
+                    temperature=0.0,
+                )
+                info["ping"] = f"OK ({len(resp.content)} chars back)"
+        except Exception as e:
+            info["ping"] = f"FAILED: {e}"
         print(_json.dumps(info, indent=2))
         if info.get("LLM_BACKEND_env_present_but_ignored"):
             print(
@@ -58,6 +72,18 @@ def main(argv: list[str] | None = None) -> int:
                 "LUKAV_LLM_BACKEND if you actually want a non-Claude "
                 "backend here."
             )
+        if isinstance(info.get("ping"), str) and info["ping"].startswith("FAILED"):
+            if "401" in info["ping"] or "auth" in info["ping"].lower():
+                print(
+                    "\nAuth failure. Fix one of two ways:\n"
+                    "  1) Refresh the claude CLI:\n"
+                    "       claude /login\n"
+                    "       claude /status\n"
+                    "  2) Or switch to API key:\n"
+                    "       pip install -e \".[anthropic]\"\n"
+                    "       set ANTHROPIC_API_KEY=sk-...   (or $env on PowerShell)\n"
+                    "       set LUKAV_LLM_BACKEND=anthropic\n"
+                )
         if info.get("resolved", "").startswith("none"):
             print(
                 "\nLukav will run WITHOUT an LLM. Audit, letters, and "
