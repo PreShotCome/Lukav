@@ -14,6 +14,22 @@
     <code>LUKAV_LLM_BACKEND=claude</code> and re-run, or check
     <code>python -m lukav --check-llm</code>.
   </p>
+  {% elif result.error and "401" in result.error %}
+  <p class="bad">
+    The Claude CLI failed with <code>401 Invalid authentication credentials</code>.
+    Your Claude Code session has expired. Fix it one of two ways:
+  </p>
+  <ol class="muted">
+    <li>Re-auth the CLI: <code>claude /login</code> (or just run
+      <code>claude</code> once interactively to refresh the session),
+      confirm with <code>claude /status</code>, then re-upload.</li>
+    <li>Switch Lukav to the Anthropic SDK with an API key:
+      <code>pip install -e ".[anthropic]"</code>, set
+      <code>ANTHROPIC_API_KEY</code>, set
+      <code>LUKAV_LLM_BACKEND=anthropic</code>, and re-run
+      <code>python -m lukav --check-llm</code>. This bypasses the CLI
+      entirely.</li>
+  </ol>
   {% elif result.backend in ("none", "error") %}
   <p class="bad">
     The LLM did not run. Without it, this page only shows the raw text

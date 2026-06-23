@@ -41,14 +41,17 @@ def build_default_client(
         from .claude_client import ClaudeCliClient, _claude_available
         if not _claude_available():
             return None
-        # Default to None so the CLI picks its own current model.
-        # Hardcoding a specific name (e.g. claude-opus-4-7) caused
-        # "claude CLI exit 1" on older / newer CLI installs that didn't
-        # recognize that exact id. CLAUDE_MODEL env still lets the user
-        # pin one.
         return ClaudeCliClient(
             model=model or os.environ.get("CLAUDE_MODEL") or None
         )
+    if backend == "anthropic":
+        from .anthropic_client import AnthropicClient, _anthropic_available
+        if not _anthropic_available():
+            raise RuntimeError(
+                "anthropic SDK not installed. Install with "
+                "`pip install lukav[anthropic]` to use the API-key backend."
+            )
+        return AnthropicClient(model=model)
     if backend == "ollama":
         from .ollama_client import OllamaClient
         return OllamaClient(model=model)
@@ -70,6 +73,14 @@ def describe_default_backend() -> dict:
         from .claude_client import _claude_available
         info["claude_cli_on_path"] = _claude_available()
         info["resolved"] = "claude" if _claude_available() else "none (no claude CLI)"
+    elif chosen == "anthropic":
+        from .anthropic_client import _anthropic_available, _api_key
+        info["anthropic_sdk_installed"] = _anthropic_available()
+        info["anthropic_api_key_set"] = bool(_api_key())
+        if _anthropic_available() and _api_key():
+            info["resolved"] = "anthropic"
+        else:
+            info["resolved"] = "none (anthropic SDK or API key missing)"
     elif chosen == "ollama":
         info["resolved"] = "ollama"
         info["OLLAMA_MODEL"] = os.environ.get("OLLAMA_MODEL")

@@ -24,6 +24,16 @@ def test_none_disables_llm(monkeypatch):
     assert build_default_client() is None
 
 
+def test_anthropic_backend_requires_sdk(monkeypatch):
+    monkeypatch.setenv("LUKAV_LLM_BACKEND", "anthropic")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    # If the SDK isn't installed in this environment, build raises.
+    # If it is installed but no key, build raises for missing key.
+    import pytest
+    with pytest.raises(RuntimeError):
+        build_default_client()
+
+
 def test_unknown_backend_raises(monkeypatch):
     monkeypatch.setenv("LUKAV_LLM_BACKEND", "gpt-banana")
     import pytest
