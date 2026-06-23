@@ -60,6 +60,24 @@ SYSTEM_PROMPT = (
 CHUNK_SIZE = 6000           # chars per LLM call
 CHUNK_OVERLAP = 400         # carry tail into next chunk to catch table-boundary tradelines
 
+# Words that mark a chunk as worth sending to the LLM. Credit reports are
+# dominated by good-standing accounts, personal info, inquiries, and
+# disclaimers — sending those to the LLM is just paying for noise. We
+# only send chunks that hit at least one of these keywords.
+NEGATIVE_KEYWORDS = (
+    "collection", "collections", "charge-off", "charge off", "chargeoff",
+    "charged off", "past due", "delinquent", "delinquency",
+    "deficiency", "repossession", "bankruptcy",
+    "settled", "settlement", "settled for less",
+    "120 days", "150 days", "180 days", "90 days",
+    "60 days", "30 days late", "in dispute",
+    "negative account", "negative item", "negative info",
+    "transferred / sold", "transferred/sold", "sold to",
+    "judgement", "judgment", "lien",
+    "midland", "portfolio recovery", "lvnv", "cavalry",
+    "jefferson capital", "encore", "resurgent", "convergent",
+)
+
 
 def _chunk_text(text: str) -> list[str]:
     """Split the report into overlapping ~6k-char chunks. Prefers
@@ -83,6 +101,14 @@ def _chunk_text(text: str) -> list[str]:
             break
         i = max(end - CHUNK_OVERLAP, i + 1)
     return chunks
+
+
+def _chunk_is_relevant(chunk: str) -> bool:
+    """Cheap pre-filter: only ask the LLM about chunks that contain
+    negative-account keywords. Cuts a 20-chunk Experian report down to
+    typically 2-4 LLM calls."""
+    lower = chunk.lower()
+    return any(kw in lower for kw in NEGATIVE_KEYWORDS)
 
 
 @dataclass
@@ -193,12 +219,23 @@ def extract_credit_report(text: str, *,
     out.backend = client.__class__.__name__
 
     chunks = _chunk_text(text)
+    relevant = [(idx, c) for idx, c in enumerate(chunks)
+                if _chunk_is_relevant(c)]
+    if not relevant:
+        out.error = (
+            "No chunks contained negative-account keywords. Either the "
+            "report has no collections / charge-offs / late accounts, or "
+            "the text extraction missed the negative section. Spot-check "
+            "the raw text below."
+        )
+        return out
+
     raw_lower = text.lower()
     seen_keys: set[tuple[str, str]] = set()
     errors: list[str] = []
     ungrounded_dropped = 0
 
-    for idx, chunk in enumerate(chunks):
+    for idx, chunk in relevant:
         try:
             msg = client.chat(
                 messages=[
