@@ -245,6 +245,12 @@ class CreditReportExtraction:
     raw_text: str = ""
     backend: str = "none"
     error: str = ""
+    chunks_total: int = 0
+    chunks_processed: int = 0
+    chunks_with_keywords: int = 0
+    raw_extracted_count: int = 0      # before grounding / dedup
+    ungrounded_dropped: int = 0
+    duplicates_dropped: int = 0
 
 
 def extract_text_from_pdf(data: bytes) -> str:
@@ -333,23 +339,19 @@ def extract_credit_report(text: str, *,
     out.backend = client.__class__.__name__
 
     chunks = _chunk_text(text)
-    relevant = [(idx, c) for idx, c in enumerate(chunks)
-                if _chunk_is_relevant(c)]
-    if not relevant:
-        out.error = (
-            "No chunks contained negative-account keywords. Either the "
-            "report has no collections / charge-offs / late accounts, or "
-            "the text extraction missed the negative section. Spot-check "
-            "the raw text below."
-        )
-        return out
+    out.chunks_total = len(chunks)
+    out.chunks_with_keywords = sum(1 for c in chunks if _chunk_is_relevant(c))
 
     raw_lower = text.lower()
     seen_keys: set[tuple[str, str]] = set()
     errors: list[str] = []
-    ungrounded_dropped = 0
 
-    for idx, chunk in relevant:
+    # Process every chunk. The previous "skip chunks without negative
+    # keywords" gate dropped too many real tradelines on bureaus that
+    # interleave payment-history grids without using words like
+    # "collection" or "charge-off". Trust the SYSTEM_PROMPT's
+    # "SKIP current accounts" instruction instead.
+    for idx, chunk in enumerate(chunks):
         try:
             msg = client.chat(
                 messages=[
@@ -361,6 +363,7 @@ def extract_credit_report(text: str, *,
                 ],
                 temperature=0.0,
             )
+            out.chunks_processed += 1
         except Exception as e:
             errors.append(f"chunk {idx + 1}: {e}")
             continue
@@ -376,30 +379,26 @@ def extract_credit_report(text: str, *,
             if not isinstance(d, dict):
                 continue
             tradeline = _coerce_tradeline(d)
+            out.raw_extracted_count += 1
             if not _is_grounded(tradeline, text, raw_lower):
-                ungrounded_dropped += 1
+                out.ungrounded_dropped += 1
                 continue
-            # Regex fallback for any date the LLM didn't fill.
             _regex_fill_dates(tradeline, text)
             key = (
                 tradeline.collector_name.lower().strip(),
                 tradeline.account_mask or "",
             )
             if key in seen_keys:
+                out.duplicates_dropped += 1
                 continue
             seen_keys.add(key)
             out.tradelines.append(tradeline)
 
-    # One more sweep: for tradelines that still have empty dates, look
-    # across the WHOLE report (not just the chunk).
     for t in out.tradelines:
         _regex_fill_dates(t, text)
 
     if errors:
         out.error = " | ".join(errors[:3])
-    if ungrounded_dropped:
-        suffix = f"{ungrounded_dropped} row(s) dropped as ungrounded."
-        out.error = (out.error + " " + suffix) if out.error else suffix
     return out
 
 

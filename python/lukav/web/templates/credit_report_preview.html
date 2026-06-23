@@ -6,6 +6,15 @@
     Backend: <code>{{ result.backend }}</code>
     {% if result.error %}<span class="bad">— {{ result.error }}</span>{% endif %}
   </p>
+  <p class="muted">
+    Source text: <code>{{ "{:,}".format(result.raw_text|length) }}</code> chars ·
+    Chunks: <code>{{ result.chunks_processed }}/{{ result.chunks_total }}</code> processed
+    ({{ result.chunks_with_keywords }} flagged as likely-negative) ·
+    Raw rows from LLM: <code>{{ result.raw_extracted_count }}</code> ·
+    Dropped ungrounded: <code>{{ result.ungrounded_dropped }}</code> ·
+    Dropped duplicate: <code>{{ result.duplicates_dropped }}</code> ·
+    Kept: <code>{{ result.tradelines|length }}</code>
+  </p>
   {% if result.backend == "OllamaClient" %}
   <p class="bad">
     Warning: Ollama (a local model) was used, not Claude. On most local
@@ -102,7 +111,8 @@
 {% if result.raw_text %}
 <div class="card">
   <strong>Raw extracted text</strong>
-  <pre style="white-space:pre-wrap; background:var(--surface); padding:1rem; border-radius:6px; max-height:300px; overflow:auto">{{ result.raw_text[:5000] }}</pre>
+  <span class="muted">— {{ "{:,}".format(result.raw_text|length) }} chars total. Use the scrollbar to verify the LLM saw your full report.</span>
+  <pre style="white-space:pre-wrap; background:var(--surface); padding:1rem; border-radius:6px; max-height:600px; overflow:auto">{{ result.raw_text }}</pre>
 </div>
 {% endif %}
 {% endblock %}
